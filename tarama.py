@@ -327,6 +327,7 @@ SP500_URL = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
 SP500_YEDEK_URL = 'https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv'
 FACTS_ZIP = 'https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip'
 ADAY_SAYISI = int(os.environ.get('ADAY_SAYISI', '500'))
+TOPLAM_SINIR = int(os.environ.get('TOPLAM_SINIR', '1000'))  # sheet'teki Tarama sayfası 1000 satır alır
 
 
 class _TabloOkuyucu(HTMLParser):
@@ -517,10 +518,20 @@ def main():
             gorulen.add(e[0])
             evren.append((t.replace('.', '-'), e[0], 'S&P 500'))
 
+    # tickers.txt'te olup endekste olmayanlar 3. adımda eklenecek; toplam TOPLAM_SINIR'ı aşmasın
+    ek_cik, ek_bulunamayan = set(), set()
+    for t in ek:
+        e = ticker_harita.get(t.replace('.', '-'))
+        if e and e[0] not in gorulen:
+            ek_cik.add(e[0])
+        elif not e:
+            ek_bulunamayan.add(t)  # yine de (hata notuyla) bir satır yer kaplar
+    aday_kota = max(0, min(ADAY_SAYISI, TOPLAM_SINIR - len(evren) - len(ek_cik) - len(ek_bulunamayan)))
+
     # 2) Endekse aday: endeks dışındaki, son 12 ayı kârlı en büyük şirketler
     adaylar = []
     for cik, t in cik_ticker.items():
-        if cik in gorulen:
+        if cik in gorulen or cik in ek_cik:
             continue
         facts = zipten_oku(z, cik)
         if not facts or 'us-gaap' not in (facts.get('facts') or {}):
@@ -533,10 +544,10 @@ def main():
             continue  # S&P 500'e girmek için kâr şartı var
         adaylar.append((deger, t, cik))
     adaylar.sort(reverse=True)
-    for deger, t, cik in adaylar[:ADAY_SAYISI]:
+    for deger, t, cik in adaylar[:aday_kota]:
         gorulen.add(cik)
         evren.append((t, cik, 'Aday'))
-    print(f'Endeks dışı uygun şirket: {len(adaylar)}, seçilen: {min(len(adaylar), ADAY_SAYISI)}')
+    print(f'Endeks dışı uygun şirket: {len(adaylar)}, seçilen: {min(len(adaylar), aday_kota)}')
 
     # 3) tickers.txt'teki ek hisseler (portföyündekiler gibi)
     for t in ek:
@@ -544,7 +555,8 @@ def main():
         if e and e[0] not in gorulen:
             gorulen.add(e[0])
             evren.append((t.replace('.', '-'), e[0], 'Ek liste'))
-        elif not e:
+        elif not e and t in ek_bulunamayan:
+            ek_bulunamayan.discard(t)
             evren.append((t, None, 'Ek liste'))
 
     simdi = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
