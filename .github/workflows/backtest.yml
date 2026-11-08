@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Paketleri kur
-        run: pip install pandas numpy yfinance matplotlib
+        run: pip install pandas numpy yfinance matplotlib openpyxl
       - name: Testi calistir
         env:
           SEC_UA: ${{ vars.SEC_UA }}
