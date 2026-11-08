@@ -1,0 +1,10 @@
+{
+ "calisma": "2026-11-08 11:40 UTC",
+ "donem": "2015-01-02 - 2026-10-30",
+ "islem_maliyeti": 1.5,
+ "uyarilar": [
+  "S&P 500 geçmiş üyeliği kurulamadı (değişiklik tablosu beklenenden kısa); bugünkü liste bütün dönem için kullanıldı.",
+  "Geçmişte S&P 500'de olup bugün borsada bulunmayan 1 şirket (iflas, birleşme, satın alma) teste dahil edilemedi. Bu, sonuçları bir miktar iyimser yapar."
+ ],
+ "sure_dk": 13.4
+}
