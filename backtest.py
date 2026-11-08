@@ -32,7 +32,16 @@ import tarama as T
 # ---------------------------------------------------------------- test ayarları
 BASLANGIC = os.environ.get('BT_BASLANGIC', '2015-01-02')
 ADAY_SAYISI = int(os.environ.get('ADAY_SAYISI', '500'))
-ISLEM_MALIYETI = float(os.environ.get('BT_MALIYET', '0.001'))  # tek yön: %0,10 (komisyon + alış/satış farkı)
+def _maliyet_oku():
+    """Tek yön işlem maliyeti YÜZDE olarak girilir: 0.10 = %0,10 (komisyon + alış/satış farkı)."""
+    ham = str(os.environ.get('BT_MALIYET_YUZDE') or '0.10').strip().replace('%', '').replace(',', '.')
+    yuzde = float(ham)
+    if not 0 <= yuzde <= 2:
+        sys.exit(f'İşlem maliyeti %{yuzde} anlamsız görünüyor. Yüzde olarak gir: 0.10 = %0,10.')
+    return yuzde / 100
+
+
+ISLEM_MALIYETI = _maliyet_oku()
 CIKTI = 'backtest'
 
 # Sheet'teki Ayarlar sekmesinin varsayılanları
@@ -202,22 +211,104 @@ class TabloOkuyucu(HTMLParser):
             self.hucre.append(data)
 
 
-def sp500_degisiklikleri(ua):
-    """Wikipedia'daki S&P 500 değişiklik tablosu: [(tarih, eklenen, çıkarılan), ...]"""
-    html = T.indir(T.SP500_URL, ua).decode('utf-8')
-    o = TabloOkuyucu('changes')
-    o.feed(html)
-    degisim = []
-    for s in o.satirlar:
-        if len(s) < 4:
-            continue
+class TumTablolar(HTMLParser):
+    """Sayfadaki bütün tabloları okur; rowspan/colspan birleştirmelerini açarak düz satırlar üretir."""
+
+    def __init__(self):
+        super().__init__()
+        self.yigin, self.tablolar = [], []
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == 'table':
+            self.yigin.append({'id': a.get('id'), 'satirlar': [], 'satir': None, 'hucre': None})
+        elif self.yigin:
+            t = self.yigin[-1]
+            if tag == 'tr':
+                t['satir'] = []
+            elif tag in ('td', 'th') and t['satir'] is not None:
+                sayi = lambda v: int(re.sub(r'\D', '', v or '') or 1)
+                t['hucre'] = {'metin': [], 'rs': sayi(a.get('rowspan')), 'cs': sayi(a.get('colspan')), 'th': tag == 'th'}
+
+    def handle_endtag(self, tag):
+        if not self.yigin:
+            return
+        t = self.yigin[-1]
+        if tag in ('td', 'th') and t['hucre'] is not None:
+            h = t['hucre']
+            h['metin'] = ' '.join(''.join(h['metin']).split())
+            t['satir'].append(h)
+            t['hucre'] = None
+        elif tag == 'tr' and t['satir'] is not None:
+            t['satirlar'].append(t['satir'])
+            t['satir'] = None
+        elif tag == 'table':
+            self.yigin.pop()
+            self.tablolar.append((t['id'], self._ac(t['satirlar'])))
+
+    def handle_data(self, data):
+        if self.yigin and self.yigin[-1]['hucre'] is not None:
+            self.yigin[-1]['hucre']['metin'].append(data)
+
+    @staticmethod
+    def _ac(satirlar):
+        bekleyen, cikti = {}, []   # sütun -> (metin, kalan satır, başlık mı)
+        for satir in satirlar:
+            yeni, j, hucreler = [], 0, list(satir)
+            while hucreler or j in bekleyen:
+                if j in bekleyen:
+                    metin, kalan, th = bekleyen[j]
+                    yeni.append((metin, th))
+                    if kalan <= 1:
+                        del bekleyen[j]
+                    else:
+                        bekleyen[j] = (metin, kalan - 1, th)
+                    j += 1
+                    continue
+                h = hucreler.pop(0)
+                for _ in range(h['cs']):
+                    yeni.append((h['metin'], h['th']))
+                    if h['rs'] > 1:
+                        bekleyen[j] = (h['metin'], h['rs'] - 1, h['th'])
+                    j += 1
+            cikti.append(yeni)
+        return cikti
+
+
+def _tarih_coz(metin):
+    metin = re.sub(r'\[.*?\]', '', metin).strip()
+    for bicim in ('%B %d, %Y', '%b %d, %Y', '%Y-%m-%d', '%d %B %Y'):
         try:
-            t = datetime.strptime(re.sub(r'\[.*?\]', '', s[0]).strip(), '%B %d, %Y').date()
+            return datetime.strptime(metin, bicim).date()
         except ValueError:
+            pass
+    return None
+
+
+def sp500_degisiklikleri(ua, html=None):
+    """Wikipedia'daki S&P 500 değişiklik tablosu: [(tarih, eklenen, çıkarılan), ...]"""
+    if html is None:
+        html = T.indir(T.SP500_URL, ua).decode('utf-8')
+    o = TumTablolar()
+    o.feed(html)
+    hedef = None
+    for tid, satirlar in o.tablolar:  # başlığında "Added" ve "Removed" geçen tablo
+        baslik = ' '.join(m for sat in satirlar[:3] for m, th in sat if th).lower()
+        if tid == 'changes' or ('added' in baslik and 'removed' in baslik):
+            hedef = satirlar
+            break
+    if hedef is None:
+        raise RuntimeError('değişiklik tablosu bulunamadı')
+    degisim = []
+    for sat in hedef:
+        if all(th for _, th in sat) or len(sat) < 4:
+            continue  # başlık satırı
+        metin = [m for m, _ in sat]
+        t = _tarih_coz(metin[0])
+        if t is None:
             continue
-        eklenen = s[1].strip().upper().replace('.', '-')
-        cikan = s[3].strip().upper().replace('.', '-') if len(s) > 3 else ''
-        degisim.append((t, eklenen, cikan))
+        temiz = lambda x: x.strip().upper().replace('.', '-') if re.fullmatch(r'[A-Za-z][A-Za-z0-9.\-]{0,9}', x.strip()) else ''
+        degisim.append((t, temiz(metin[1]), temiz(metin[3]) if len(metin) > 3 else ''))
     return degisim
 
 
