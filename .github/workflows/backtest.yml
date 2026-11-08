@@ -1,0 +1,40 @@
+name: Geriye donuk test
+
+on:
+  workflow_dispatch:       # Yalnızca Actions sekmesinden elle çalıştırılır
+    inputs:
+      baslangic:
+        description: 'Başlangıç tarihi (YYYY-AA-GG)'
+        default: '2015-01-02'
+      maliyet:
+        description: 'Tek yön işlem maliyeti (0.001 = %0,10)'
+        default: '0.001'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Paketleri kur
+        run: pip install pandas numpy yfinance matplotlib
+      - name: Testi calistir
+        env:
+          SEC_UA: ${{ vars.SEC_UA }}
+          BT_BASLANGIC: ${{ inputs.baslangic }}
+          BT_MALIYET: ${{ inputs.maliyet }}
+        run: python backtest.py
+      - name: Sonuclari kaydet
+        run: |
+          git config user.name "tarama-bot"
+          git config user.email "tarama-bot@users.noreply.github.com"
+          git add backtest
+          git diff --cached --quiet || git commit -m "Geriye donuk test sonuclari"
+          git pull --rebase
+          git push
