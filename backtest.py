@@ -579,6 +579,26 @@ def olcumler(seri, hacim=None, adet=None):
 
 
 # ---------------------------------------------------------------- ana akış
+
+def gecmis_kaydi(puan, hafta_sayisi=54):
+    """Son ~1 yılın haftalık aday giriş-çıkışları (sheet'teki Geçmiş sekmesine 'Test' etiketiyle yüklenir)."""
+    tarihler = sorted(puan['tarih'].unique())[-hafta_sayisi:]
+    a = puan[puan['tarih'].isin(tarihler) & puan['aday']]
+    tum = puan[puan['tarih'].isin(tarihler)].set_index(['tarih', 'ticker'])['toplam']
+    kayit, onceki = [], None
+    for d in tarihler:
+        s = set(a.loc[a['tarih'] == d, 'ticker'])
+        if onceki is not None:
+            for t in sorted(s - onceki):
+                kayit.append((d, t, 'Listeye girdi', tum.get((d, t))))
+            for t in sorted(onceki - s):
+                kayit.append((d, t, 'Listeden çıktı', tum.get((d, t))))
+        onceki = s
+    g = pd.DataFrame(kayit, columns=['tarih', 'hisse', 'olay', 'toplam'])
+    g['toplam'] = g['toplam'].round(4)
+    return g.sort_values(['tarih', 'olay', 'hisse'], ascending=[False, False, True])  # en yeni üstte, girenler önce
+
+
 def main():
     ua = os.environ.get('SEC_UA', '').strip()
     if '@' not in ua:
@@ -701,6 +721,7 @@ def main():
     puan['endeks'] = df['endeks'].values
     puan['sic'] = df['sic'].values
     puan.to_csv(os.path.join(CIKTI, 'puanlar.csv.gz'), index=False, compression='gzip')
+    gecmis_kaydi(puan).to_csv(os.path.join(CIKTI, 'gecmis.csv'), index=False)
     print(f'  {len(puan)} satır puanlandı ({time.time() - t0:.0f} sn)')
 
     # Haftalık getiriler: t'den bir sonraki haftaya
