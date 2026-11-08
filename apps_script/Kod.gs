@@ -1,11 +1,12 @@
 /**
- * ABD Değer Taraması — sheet tarafı (Google Apps Script), sürüm 6 (1000 hisse + geriye dönük test + trend bilgisi + Geçmiş en yeni üstte)
+ * ABD Değer Taraması — sheet tarafı (Google Apps Script), sürüm 7 (1000 hisse + geriye dönük test + trend bilgisi + Geçmiş en yeni üstte + haftalık haber bülteni)
  *
  * Veriler artık GitHub'da çalışan programdan gelir (SEC, Google sunucularını engelliyor).
  * Bu script:
  *  1. GitHub'daki veri.csv dosyasını "Veri" sekmesine yazar.
  *  2. "Tarama" sekmesindeki formüllerin puanlamasını bekler.
  *  3. Aday listesindeki değişiklikleri e-postayla bildirir.
+ *  4. Claude'un pazartesi öğlen GitHub'a yazdığı haber bültenini (bulten/son.html) e-postayla gönderir.
  */
 
 const SAYFA = { AYAR: 'Ayarlar', VERI: 'Veri', TARAMA: 'Tarama', GECMIS: 'Geçmiş' };
@@ -18,6 +19,7 @@ function onOpen() {
     .addItem('2) Otomatik çalışmayı kur', 'kurulum')
     .addSeparator()
     .addItem('Raporu şimdi gönder', 'raporGonder')
+    .addItem('Haber bültenini şimdi gönder', 'bultenGonderElle')
     .addSeparator()
     .addItem('Geriye dönük test sonuçlarını çek', 'testSonuclariniCek')
     .addToUi();
@@ -46,7 +48,11 @@ function kurulum() {
   // GitHub pazartesi 07:00'de çalışır; script 10:00'da sonucu alıp raporu yollar.
   ScriptApp.newTrigger('haftalikIs').timeBased()
     .onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(10).inTimezone('Europe/Istanbul').create();
-  uyar_('Kuruldu. Her pazartesi sabah veriler güncellenecek ve rapor e-postana gelecek.');
+  // Claude bülteni pazartesi öğlen hazırlar; 14:00'te gönderilir, gecikirse 18:00'de tekrar denenir.
+  [14, 18].forEach(saat => ScriptApp.newTrigger('bultenGonder').timeBased()
+    .onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(saat).inTimezone('Europe/Istanbul').create());
+  uyar_('Kuruldu. Her pazartesi sabah veriler güncellenecek ve rapor e-postana gelecek; ' +
+        'öğleden sonra da haber bülteni gelecek.');
 }
 
 function haftalikIs() {
@@ -155,6 +161,39 @@ function raporGonder() {
           'Detaylar: ' + ss.getUrl() + '</p></div>';
   const konu = 'Değer taraması: ' + adaylar.length + ' aday' + (yeni.length ? ', ' + yeni.length + ' yeni giriş' : '');
   MailApp.sendEmail({ to: ayar.eposta, subject: konu, htmlBody: html });
+}
+
+// ---------------------------------------------------------------- haber bülteni
+
+/** Menüden: tarih ve "zaten gönderildi" kontrolü yapmadan son bülteni gönderir. */
+function bultenGonderElle() { bultenGonder(true); }
+
+/** GitHub'daki bulten/son.html dosyasını okuyup e-postayla gönderir. */
+function bultenGonder(zorla) {
+  zorla = zorla === true;
+  const ayar = ayarOku_();
+  const adres = ayar.adres.replace(/veri\.csv(\?.*)?$/, 'bulten/son.html');
+  const p = PropertiesService.getScriptProperties();
+  const res = UrlFetchApp.fetch(adres + '?t=' + Date.now(), { muteHttpExceptions: true });
+  const html = res.getResponseCode() === 200 ? res.getContentText('UTF-8') : '';
+  const m = html.match(/<meta name="bulten-tarihi" content="(\d{4}-\d{2}-\d{2})"/);
+  const tarih = m ? m[1] : '';
+  const gun = tarih ? (new Date() - new Date(tarih + 'T00:00:00')) / (24 * 3600 * 1000) : 99;
+
+  if (!zorla && tarih && tarih === p.getProperty('sonBulten')) return;   // bu hafta zaten gönderildi
+  if (!zorla && gun > 3) {
+    // 14:00'te bülten henüz yoksa 18:00'i bekle; 18:00'de de yoksa haber ver.
+    if (Number(Utilities.formatDate(new Date(), 'Europe/Istanbul', 'H')) >= 17) {
+      MailApp.sendEmail({ to: ayar.eposta, subject: 'Haber bülteni bu hafta hazırlanamadı',
+        htmlBody: '<p>Bu haftanın haber bülteni GitHub\'da bulunamadı (son bülten: ' + (tarih || 'yok') + ').</p>' +
+                  '<p>Claude\'daki zamanlanmış görev çalışmamış olabilir; Claude\'a "bu haftanın bültenini hazırla" diyebilirsin.</p>' });
+    }
+    return;
+  }
+  if (!html) throw new Error('bulten/son.html okunamadı (kod ' + res.getResponseCode() + ').');
+  const t = html.match(/<title>([^<]*)<\/title>/);
+  MailApp.sendEmail({ to: ayar.eposta, subject: t ? t[1] : 'Haftalık haber bülteni', htmlBody: html });
+  if (tarih) p.setProperty('sonBulten', tarih);
 }
 
 // ---------------------------------------------------------------- geriye dönük test
