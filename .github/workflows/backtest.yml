@@ -6,9 +6,9 @@ on:
       baslangic:
         description: 'Başlangıç tarihi (YYYY-AA-GG)'
         default: '2015-01-02'
-      maliyet:
-        description: 'Tek yön işlem maliyeti (0.001 = %0,10)'
-        default: '0.001'
+      maliyet_yuzde:
+        description: 'Tek yön işlem maliyeti, YÜZDE olarak (0.10 = %0,10)'
+        default: '0.10'
 
 permissions:
   contents: write
@@ -28,7 +28,7 @@ jobs:
         env:
           SEC_UA: ${{ vars.SEC_UA }}
           BT_BASLANGIC: ${{ inputs.baslangic }}
-          BT_MALIYET: ${{ inputs.maliyet }}
+          BT_MALIYET_YUZDE: ${{ inputs.maliyet_yuzde }}
         run: python backtest.py
       - name: Sonuclari kaydet
         run: |
