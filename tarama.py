@@ -30,7 +30,7 @@ VERI_SUTUNLARI = [
     'varlik', 'yukumluluk', 'ozkaynak', 'donenVarlik', 'kvYukumluluk', 'nakit', 'borc', 'gecmisKar', 'hisseAdedi',
     'satisFY', 'satisFY1', 'netKarFY', 'netKarFY1', 'varlikFY', 'varlikFY1', 'inaFY',
     'uvBorcFY', 'uvBorcFY1', 'donenFY', 'donenFY1', 'kvYukFY', 'kvYukFY1',
-    'hisseFY', 'hisseFY1', 'brutKarFY', 'brutKarFY1', 'not', 'guncelleme', 'endeks', 'trend',
+    'hisseFY', 'hisseFY1', 'brutKarFY', 'brutKarFY1', 'not', 'guncelleme', 'endeks', 'trendKisa', 'trendOrta', 'trendUzun',
 ]
 
 ETIKET = {
@@ -446,25 +446,39 @@ def zipten_oku(z, cik):
         return None
 
 
+def _ort(k, n, geri=0):
+    """Son n günün ortalaması; geri > 0 ise o kadar gün önceki n günlük ortalama."""
+    son = len(k) - geri
+    return sum(k[son - n:son]) / n
+
+
+def _yon(yukari, asagi):
+    return 'Yükseliş' if yukari else 'Düşüş' if asagi else 'Yatay'
+
+
 def trend_durumu(kapanis):
-    """Haftalık kapanışlardan teknik trend: 40 hafta (~200 gün) ve 10 hafta (~50 gün) ortalaması.
-    Yükseliş: fiyat 40 haftalık ortalamanın üzerinde VE 10 haftalık ortalama 40 haftalığın üzerinde.
-    Düşüş: ikisinin de tersi. Diğer durumlar: Yatay."""
+    """Günlük kapanışlardan üç vadeli trend (kısa, orta, uzun).
+    Kısa (20 gün):  fiyat 20 günlük ortalamanın üzerinde VE 20 günlük ortalama 1 ay (21 işlem günü) öncesinden yüksek.
+    Orta (50 gün):  fiyat 50 günlüğün üzerinde VE 20 günlük 50 günlüğün üzerinde.
+    Uzun (200 gün): fiyat 200 günlüğün üzerinde VE 50 günlük 200 günlüğün üzerinde.
+    Koşulların ikisi de tersine dönmüşse Düşüş, karışıksa Yatay; veri yetmezse boş."""
     k = [x for x in kapanis if x is not None and x == x and x > 0]
-    if len(k) < 40:
-        return ''
-    o40 = sum(k[-40:]) / 40
-    o10 = sum(k[-10:]) / 10
-    son = k[-1]
-    if son > o40 and o10 > o40:
-        return 'Yükseliş'
-    if son < o40 and o10 < o40:
-        return 'Düşüş'
-    return 'Yatay'
+    son = k[-1] if k else None
+    kisa = orta = uzun = ''
+    if len(k) >= 41:
+        o20, o20_once = _ort(k, 20), _ort(k, 20, 21)
+        kisa = _yon(son > o20 and o20 > o20_once, son < o20 and o20 < o20_once)
+    if len(k) >= 50:
+        o20, o50 = _ort(k, 20), _ort(k, 50)
+        orta = _yon(son > o50 and o20 > o50, son < o50 and o20 < o50)
+    if len(k) >= 200:
+        o50, o200 = _ort(k, 50), _ort(k, 200)
+        uzun = _yon(son > o200 and o50 > o200, son < o200 and o50 < o200)
+    return kisa, orta, uzun
 
 
 def trend_hesapla(tickerlar):
-    """Yahoo Finance'ten son ~15 ayın haftalık kapanışları; yfinance kurulu değilse trend boş kalır."""
+    """Yahoo Finance'ten son ~15 ayın günlük kapanışları; yfinance kurulu değilse trend boş kalır."""
     try:
         import yfinance as yf
     except ImportError:
@@ -475,7 +489,7 @@ def trend_hesapla(tickerlar):
     for i in range(0, len(tickerlar), 200):
         grup = tickerlar[i:i + 200]
         try:
-            d = yf.download(grup, period='15mo', interval='1wk', auto_adjust=True, group_by='column',
+            d = yf.download(grup, period='15mo', interval='1d', auto_adjust=True, group_by='column',
                             threads=True, progress=False)
             kap = d['Close'] if 'Close' in d.columns.get_level_values(0) else None
         except Exception as e:
@@ -488,7 +502,7 @@ def trend_hesapla(tickerlar):
         for t in grup:
             if t in kap.columns:
                 sonuc[t] = trend_durumu(list(kap[t].dropna()))
-    print(f'Trend hesaplandı: {sum(1 for v in sonuc.values() if v)} hisse')
+    print(f'Trend hesaplandı: {sum(1 for v in sonuc.values() if v[2])} hisse (uzun vade dolu)')
     return sonuc
 
 
@@ -590,7 +604,7 @@ def main():
 
     trendler = trend_hesapla([r['ticker'] for r in satirlar])
     for r in satirlar:
-        r['trend'] = trendler.get(r['ticker'], '')
+        r['trendKisa'], r['trendOrta'], r['trendUzun'] = trendler.get(r['ticker'], ('', '', ''))
 
     with open('veri.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)

@@ -1,5 +1,5 @@
 /**
- * ABD Değer Taraması — sheet tarafı (Google Apps Script), sürüm 7 (1000 hisse + geriye dönük test + trend bilgisi + Geçmiş en yeni üstte + haftalık haber bülteni)
+ * ABD Değer Taraması — sheet tarafı (Google Apps Script), sürüm 8 (1000 hisse + geriye dönük test + kısa/orta/uzun vade trend + Geçmiş en yeni üstte + haftalık haber bülteni)
  *
  * Veriler artık GitHub'da çalışan programdan gelir (SEC, Google sunucularını engelliyor).
  * Bu script:
@@ -10,8 +10,8 @@
  */
 
 const SAYFA = { AYAR: 'Ayarlar', VERI: 'Veri', TARAMA: 'Tarama', GECMIS: 'Geçmiş' };
-const SUTUN_SAYISI = 46;
-const METIN_SUTUNLARI = [0, 1, 2, 4, 5, 6, 7, 42, 43, 44, 45]; // hisse, şirket, CIK, grup, sektör, tarih, kaynak, not, güncelleme, endeks, trend
+const SUTUN_SAYISI = 48;
+const METIN_SUTUNLARI = [0, 1, 2, 4, 5, 6, 7, 42, 43, 44, 45, 46, 47]; // hisse, şirket, CIK, grup, sektör, tarih, kaynak, not, güncelleme, endeks, kısa/orta/uzun vade trend
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Değer Taraması')
@@ -108,7 +108,7 @@ function raporGonder() {
   const satirlar = tar.getRange(2, 1, son - 1, tar.getLastColumn()).getValues().filter(r => r[kol('Hisse')]);
   const iHisse = kol('Hisse'), iSirket = kol('Şirket'), iTop = kol('Toplam Puan'),
         iU = kol('Ucuzluk'), iK = kol('Kalite'), iS = kol('Sağlamlık'), iB = kol('Büyüme'),
-        iAday = kol('Aday'), iBayrak = kol('Uyarılar'), iPort = kol('Portföyde'), iSira = kol('Sıra'), iEndeks = kol('Endeks'), iTrend = kol('Trend');
+        iAday = kol('Aday'), iBayrak = kol('Uyarılar'), iPort = kol('Portföyde'), iSira = kol('Sıra'), iEndeks = kol('Endeks'), iTK = kol('Kısa vade'), iTO = kol('Orta vade'), iTU = kol('Uzun vade');
 
   const adaylar = satirlar.filter(r => r[iAday] === 'ADAY').sort((a, b) => b[iTop] - a[iTop]);
   const p = PropertiesService.getScriptProperties();
@@ -140,11 +140,11 @@ function raporGonder() {
   const tablo = (liste, baslikMetni) => {
     if (!liste.length) return '<p><i>' + baslikMetni + ': yok</i></p>';
     let h = '<h3>' + baslikMetni + '</h3><table border="1" cellpadding="4" style="border-collapse:collapse;font-family:Arial;font-size:13px">' +
-      '<tr style="background:#1F3864;color:#fff"><th>Sıra</th><th>Hisse</th><th>Şirket</th><th>Endeks</th><th>Toplam</th><th>Ucuzluk</th><th>Kalite</th><th>Sağlamlık</th><th>Büyüme</th><th>Trend</th><th>Uyarılar</th></tr>';
+      '<tr style="background:#1F3864;color:#fff"><th>Sıra</th><th>Hisse</th><th>Şirket</th><th>Endeks</th><th>Toplam</th><th>Ucuzluk</th><th>Kalite</th><th>Sağlamlık</th><th>Büyüme</th><th>Kısa vade</th><th>Orta vade</th><th>Uzun vade</th><th>Uyarılar</th></tr>';
     liste.forEach(r => {
       h += '<tr><td>' + r[iSira] + '</td><td><b>' + r[iHisse] + '</b></td><td>' + r[iSirket] + '</td><td>' + (r[iEndeks] || '') + '</td><td>' + yuzde(r[iTop]) +
            '</td><td>' + yuzde(r[iU]) + '</td><td>' + yuzde(r[iK]) + '</td><td>' + yuzde(r[iS]) + '</td><td>' + yuzde(r[iB]) +
-           '</td><td>' + (r[iTrend] || '') + '</td><td>' + (r[iBayrak] || '') + '</td></tr>';
+           '</td><td>' + (r[iTK] || '') + '</td><td>' + (r[iTO] || '') + '</td><td>' + (r[iTU] || '') + '</td><td>' + (r[iBayrak] || '') + '</td></tr>';
     });
     return h + '</table>';
   };
