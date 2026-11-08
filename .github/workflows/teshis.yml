@@ -17,8 +17,8 @@ jobs:
           import os, tarama as T, backtest as B
           html = T.indir(T.SP500_URL, os.environ['SEC_UA']).decode('utf-8')
           print('uzunluk', len(html), 'changes' in html, 'id="changes"' in html)
-          o = B.TumTablolar(); o.feed(html)
-          for tid, s in o.tablolar:
-              print('TABLO', tid, len(s), [[(m[:25], th) for m, th in r] for r in s[:3]])
-          i = html.find('Selected changes'); print('SC', i, html[i:i+1500] if i >= 0 else '')
+          import re
+          for m in sorted(set(re.findall(r'href="(/wiki/[^"#]*)"', html))):
+              if 'S%26P' in m or 'hange' in m or 'S&amp;P' in m: print('LINK', m)
+          i = html.lower().find('change'); print('CH', html[max(0,i-300):i+600].replace(chr(10),' '))
           P
