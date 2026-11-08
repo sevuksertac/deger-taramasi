@@ -9,6 +9,7 @@ SEC iletişim bilgisi SEC_UA ortam değişkeninden okunur (örnek: "Ad Soyad ad@
 """
 import csv
 import gzip
+from html.parser import HTMLParser
 import io
 import json
 import os
@@ -323,27 +324,88 @@ def get_json(url, ua):
 
 # ---------------------------------------------------------------- evren
 SP500_URL = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+SP500_YEDEK_URL = 'https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv'
 FACTS_ZIP = 'https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip'
 ADAY_SAYISI = int(os.environ.get('ADAY_SAYISI', '500'))
 
 
+class _TabloOkuyucu(HTMLParser):
+    """Wikipedia'daki id="constituents" tablosunun her satırının ilk hücresini okur."""
+
+    def __init__(self):
+        super().__init__()
+        self.tablo_derinlik = 0   # hedef tablonun içindeyken > 0
+        self.satir = None
+        self.hucre = None
+        self.semboller = []
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == 'table':
+            if self.tablo_derinlik:
+                self.tablo_derinlik += 1
+            elif a.get('id') == 'constituents':
+                self.tablo_derinlik = 1
+        elif self.tablo_derinlik == 1:
+            if tag == 'tr':
+                self.satir = []
+            elif tag in ('td', 'th') and self.satir is not None:
+                self.hucre = [] if tag == 'td' else None
+
+    def handle_endtag(self, tag):
+        if tag == 'table' and self.tablo_derinlik:
+            self.tablo_derinlik -= 1
+        elif self.tablo_derinlik == 1:
+            if tag == 'td' and self.hucre is not None and self.satir is not None:
+                self.satir.append(''.join(self.hucre).strip())
+                self.hucre = None
+            elif tag == 'tr' and self.satir is not None:
+                if self.satir:
+                    self.semboller.append(self.satir[0])
+                self.satir = None
+
+    def handle_data(self, data):
+        if self.hucre is not None:
+            self.hucre.append(data)
+
+
+def _gecerli(semboller):
+    temiz = [s.strip().upper() for s in semboller if re.fullmatch(r'[A-Za-z][A-Za-z0-9.\-]{0,9}', s.strip())]
+    return list(dict.fromkeys(temiz))
+
+
+def _wikipedia(ua):
+    html = indir(SP500_URL, ua).decode('utf-8')
+    o = _TabloOkuyucu()
+    o.feed(html)
+    return _gecerli(o.semboller)
+
+
+def _yedek_kaynak(ua):
+    metin = indir(SP500_YEDEK_URL, ua).decode('utf-8')
+    satirlar = list(csv.reader(io.StringIO(metin)))
+    i = [h.strip().lower() for h in satirlar[0]].index('symbol')
+    return _gecerli([r[i] for r in satirlar[1:] if len(r) > i])
+
+
 def sp500_cek(ua):
-    """S&P 500 üyelerini Wikipedia'dan alır; alamazsa depodaki son listeyi kullanır."""
-    try:
-        html = indir(SP500_URL, ua).decode('utf-8')
-        tablo = html[html.index('id="constituents"'):]
-        tablo = tablo[:tablo.index('</table>')]
-        semboller = re.findall(r'<tr>\s*<td[^>]*>\s*(?:<a[^>]*>)?\s*([A-Z][A-Z0-9.\-]*)\s*<', tablo)
-        if len(semboller) < 450:
-            raise RuntimeError(f'beklenenden az sembol ({len(semboller)})')
-        with open('sp500.txt', 'w', encoding='utf-8') as f:
-            f.write('\n'.join(semboller) + '\n')
-        print(f'S&P 500 listesi Wikipedia\'dan alındı: {len(semboller)} sembol')
-        return semboller
-    except Exception as e:
-        print(f'Uyarı: S&P 500 listesi alınamadı ({e}); kayıtlı liste kullanılıyor.')
+    """S&P 500 üyelerini alır: önce Wikipedia, sonra yedek kaynak, en son depodaki kayıtlı liste."""
+    for ad, kaynak in (('Wikipedia', _wikipedia), ('yedek kaynak', _yedek_kaynak)):
+        try:
+            semboller = kaynak(ua)
+            if len(semboller) < 450:
+                raise RuntimeError(f'beklenenden az sembol ({len(semboller)})')
+            with open('sp500.txt', 'w', encoding='utf-8') as f:
+                f.write('\n'.join(semboller) + '\n')
+            print(f'S&P 500 listesi {ad} üzerinden alındı: {len(semboller)} sembol')
+            return semboller
+        except Exception as e:
+            print(f'Uyarı: S&P 500 listesi {ad} üzerinden alınamadı ({e})')
+    if os.path.exists('sp500.txt'):
+        print('Depodaki kayıtlı S&P 500 listesi kullanılıyor.')
         with open('sp500.txt', encoding='utf-8') as f:
-            return [s.strip() for s in f if s.strip()]
+            return [x.strip() for x in f if x.strip()]
+    sys.exit('S&P 500 listesi hiçbir kaynaktan alınamadı.')
 
 
 def borsa_listesi(ua):
