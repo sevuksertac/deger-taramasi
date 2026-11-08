@@ -285,18 +285,52 @@ def _tarih_coz(metin):
     return None
 
 
+ESKI_SURUM_NOTU = []
+
+
+def _degisim_tablosu(html):
+    o = TumTablolar()
+    o.feed(html)
+    for tid, satirlar in o.tablolar:  # başlığında "Added" ve "Removed" geçen tablo
+        baslik = ' '.join(m for sat in satirlar[:3] for m, th in sat if th).lower()
+        if tid == 'changes' or ('added' in baslik and 'removed' in baslik):
+            return satirlar
+    return None
+
+
+def _eski_surumden_tablo(ua, deneme=4):
+    """Wikipedia sayfa geçmişinde, boyutu belirgin büyük olan (tabloyu içeren) en yeni sürümü bulur."""
+    api = ('https://en.wikipedia.org/w/api.php?action=query&prop=revisions'
+           '&titles=List_of_S%26P_500_companies&rvlimit=500&rvprop=ids|timestamp|size&format=json')
+    try:
+        d = json.loads(T.indir(api, ua))
+        surumler = list(d['query']['pages'].values())[0]['revisions']
+    except Exception as e:
+        print(f'Wikipedia sayfa geçmişi alınamadı: {e}')
+        return None
+    simdiki = surumler[0]['size']
+    for r in [r for r in surumler if r['size'] >= simdiki * 1.5][:deneme]:
+        try:
+            html = T.indir(f"https://en.wikipedia.org/w/index.php?oldid={r['revid']}", ua).decode('utf-8')
+        except Exception as e:
+            print(f"Eski sürüm {r['revid']} alınamadı: {e}")
+            continue
+        tablo = _degisim_tablosu(html)
+        if tablo:
+            print(f"S&P 500 değişiklikleri Wikipedia'nın {r['timestamp'][:10]} tarihli sürümünden alındı")
+            ESKI_SURUM_NOTU.append(r['timestamp'][:10])
+            return tablo
+    return None
+
+
 def sp500_degisiklikleri(ua, html=None):
     """Wikipedia'daki S&P 500 değişiklik tablosu: [(tarih, eklenen, çıkarılan), ...]"""
     if html is None:
         html = T.indir(T.SP500_URL, ua).decode('utf-8')
-    o = TumTablolar()
-    o.feed(html)
-    hedef = None
-    for tid, satirlar in o.tablolar:  # başlığında "Added" ve "Removed" geçen tablo
-        baslik = ' '.join(m for sat in satirlar[:3] for m, th in sat if th).lower()
-        if tid == 'changes' or ('added' in baslik and 'removed' in baslik):
-            hedef = satirlar
-            break
+    hedef = _degisim_tablosu(html)
+    if hedef is None:
+        # Kasım 2026'da tablo sayfadan kaldırıldı: sayfanın tabloyu içeren son eski sürümünü kullan
+        hedef = _eski_surumden_tablo(ua)
     if hedef is None:
         raise RuntimeError('değişiklik tablosu bulunamadı')
     degisim = []
@@ -571,6 +605,9 @@ def main():
         if len(degisim) < 50:
             raise RuntimeError('değişiklik tablosu beklenenden kısa')
         sp_gecmis = sp500_gecmis(guncel_sp, degisim, [h.date() for h in haftalar])
+        if ESKI_SURUM_NOTU:
+            uyarilar.append(f"S&P 500 değişiklik tablosu Wikipedia'dan kaldırıldığı için sayfanın {ESKI_SURUM_NOTU[0]} tarihli sürümü kullanıldı; "
+                            "bu tarihten sonraki endeks değişiklikleri geçmiş üyeliğe yansımadı (etkisi çok küçük).")
     except Exception as e:
         uyarilar.append(f'S&P 500 geçmiş üyeliği kurulamadı ({e}); bugünkü liste bütün dönem için kullanıldı.')
         sp_gecmis = {h.date(): set(t.replace('.', '-') for t in guncel_sp) for h in haftalar}
