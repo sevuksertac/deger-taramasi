@@ -150,6 +150,7 @@ def _gecis2(arg):
             r['hisseAdedi'] = hisse_adedi_kesimli(facts, e)
             r['cik'] = cik
             r['acik'] = e
+            r['sic'] = sic
             kayit.append(r)
     _KESIM = None
     return kayit
@@ -570,6 +571,7 @@ def main():
     df = df[df['pd'].notna() & (df['pd'] > 0)].reset_index(drop=True)
     puan = puanla(df)
     puan['endeks'] = df['endeks'].values
+    puan['sic'] = df['sic'].values
     puan.to_csv(os.path.join(CIKTI, 'puanlar.csv.gz'), index=False, compression='gzip')
     print(f'  {len(puan)} satır puanlandı ({time.time() - t0:.0f} sn)')
 
@@ -663,6 +665,7 @@ def main():
     dilim_ozet.to_csv(os.path.join(CIKTI, 'dilimler.csv'))
 
     analiz = aday_analizi(puan, aylik_getiri)
+    varyant = varyant_testi(puan, getiri, duz_h, sonraki, siklik)
 
     bilgi = {
         'calisma': datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC'),
@@ -672,9 +675,145 @@ def main():
     }
     with open(os.path.join(CIKTI, 'bilgi.json'), 'w', encoding='utf-8') as f:
         json.dump(bilgi, f, ensure_ascii=False, indent=1)
-    rapor_yaz(ozet_df, yillik_df, egri_df, dilim_ozet, bilgi, analiz)
+    rapor_yaz(ozet_df, yillik_df, egri_df, dilim_ozet, bilgi, analiz, varyant)
     print(ozet_df.to_string())
     print(f'Bitti: {bilgi["sure_dk"]} dk')
+
+
+# ---------------------------------------------------------------- iyileştirme denemeleri
+GELISTIRME_SONU = '2020-12-31'   # 2015-2020 geliştirme dönemi; sonrası sınama dönemi
+VERSIYONLAR = {
+    'Mevcut sistem': dict(agirlik=None, sektor_siniri=None, trend_alt=None),
+    '1) Kalite ve geri alım ağırlıklı': dict(
+        agirlik={'ucuzluk': 0.25, 'kalite': 0.45, 'saglamlik': 0.10, 'buyume': 0.20}, sektor_siniri=None, trend_alt=None),
+    '2) Sektör sınırı (en fazla 2)': dict(agirlik=None, sektor_siniri=2, trend_alt=None),
+    '3) Trend filtresi (12 ayda %30+ düşeni alma)': dict(agirlik=None, sektor_siniri=None, trend_alt=-0.30),
+    '4) Üçü birlikte': dict(agirlik={'ucuzluk': 0.25, 'kalite': 0.45, 'saglamlik': 0.10, 'buyume': 0.20},
+                            sektor_siniri=2, trend_alt=-0.30),
+}
+
+
+def sektor_adi(sic):
+    """SIC kodunun ilk iki hanesi; bütün perakende (52-59) tek sektör sayılır."""
+    try:
+        s = int(float(sic))
+    except (TypeError, ValueError):
+        return 'Bilinmiyor'
+    iki = s // 100
+    return 'Perakende' if 52 <= iki <= 59 else f'SIC {iki:02d}'
+
+
+def secim_listesi(puan, momentum, agirlik=None, sektor_siniri=None, trend_alt=None, adet=10):
+    p = puan[['tarih', 'ticker', 'ucuzluk', 'kalite', 'saglamlik', 'buyume', 'toplam', 'uyari', 'sic']].copy()
+    if agirlik:
+        tw = sum(agirlik.values())
+        p['toplam'] = ((agirlik['ucuzluk'] * p['ucuzluk'] + agirlik['kalite'] * p['kalite']
+                        + agirlik['saglamlik'] * p['saglamlik'].fillna(0.5)
+                        + agirlik['buyume'] * p['buyume'].fillna(0.5)) / tw)
+        p.loc[p['ucuzluk'].isna() | p['kalite'].isna(), 'toplam'] = np.nan
+    p = p[(p['toplam'] >= MIN_TOPLAM) & (p['ucuzluk'].fillna(0) >= MIN_UCUZLUK) & (p['uyari'] <= IZINLI_UYARI)]
+    if trend_alt is not None:
+        m = pd.Series([momentum.get((t, k), np.nan) for t, k in zip(p['tarih'], p['ticker'])], index=p.index)
+        p = p[~(m < trend_alt)]  # verisi olmayan hisse elenmez
+    p = p.sort_values(['tarih', 'toplam'], ascending=[True, False])
+    if sektor_siniri:
+        p['sektor'] = p['sic'].map(sektor_adi)
+        p['_n'] = p.groupby(['tarih', 'sektor']).cumcount()
+        p = p[p['_n'] < sektor_siniri]
+    return p.groupby('tarih').head(adet).groupby('tarih')['ticker'].apply(list).to_dict()
+
+
+def varyant_testi(puan, getiri, duz_h, sonraki, siklik):
+    mom = (duz_h / duz_h.shift(52) - 1).stack()
+    momentum = {(t, k): v for (t, k), v in mom.items()}
+    spy = getiri['SPY'] if 'SPY' in getiri.columns else None
+    donemler = {'Tüm dönem': (None, None), 'Geliştirme (2015-2020)': (None, GELISTIRME_SONU),
+                'Sınama (2021 sonrası)': (GELISTIRME_SONU, None)}
+
+    def kes(seri, bas, son):
+        if bas:
+            seri = seri[seri.index > pd.Timestamp(bas)]
+        if son:
+            seri = seri[seri.index <= pd.Timestamp(son)]
+        return seri
+
+    kayit, egriler, secimler = [], {}, {}
+    if spy is not None:
+        satir = {'Versiyon': 'S&P 500 (SPY)', 'Sıklık': '-'}
+        for dad, (b, e) in donemler.items():
+            o = olcumler(kes(spy, b, e))
+            satir[f'{dad}: yıllık getiri'] = o.get('Yıllık getiri')
+            satir[f'{dad}: Sharpe'] = o.get('Sharpe (risksiz faiz 0)')
+        o = olcumler(spy)
+        satir['En büyük düşüş'], satir['Oynaklık'] = o.get('En büyük düşüş'), o.get('Oynaklık (yıllık)')
+        kayit.append(satir)
+    for vad, ayar in VERSIYONLAR.items():
+        liste = secim_listesi(puan, momentum, **ayar)
+        secimler[vad] = liste
+        for sad, tarihler in siklik.items():
+            hedef = {sonraki[t]: liste.get(t, []) for t in tarihler if t in sonraki}
+            pg, hacim, adet = simule_et(getiri, hedef)
+            egriler[f'{vad} - {sad}'] = pg
+            satir = {'Versiyon': vad, 'Sıklık': sad}
+            for dad, (b, e) in donemler.items():
+                o = olcumler(kes(pg, b, e))
+                satir[f'{dad}: yıllık getiri'] = o.get('Yıllık getiri')
+                satir[f'{dad}: Sharpe'] = o.get('Sharpe (risksiz faiz 0)')
+            o = olcumler(pg, hacim, adet)
+            satir['En büyük düşüş'], satir['Oynaklık'] = o.get('En büyük düşüş'), o.get('Oynaklık (yıllık)')
+            satir['Yıllık işlem hacmi'] = o.get('Yıllık işlem hacmi (portföyün katı)')
+            satir['Ortalama hisse sayısı'] = o.get('Ortalama hisse sayısı')
+            kayit.append(satir)
+    kars = pd.DataFrame(kayit)
+
+    # Karar: aynı sıklıkta, iki dönemde de hem getiri hem Sharpe mevcut sistemden iyi mi?
+    karar = []
+    for _, r in kars.iterrows():
+        if r['Versiyon'] in ('Mevcut sistem', 'S&P 500 (SPY)'):
+            karar.append('')
+            continue
+        m = kars[(kars['Versiyon'] == 'Mevcut sistem') & (kars['Sıklık'] == r['Sıklık'])].iloc[0]
+        iyi = all(r[f'{d}: yıllık getiri'] > m[f'{d}: yıllık getiri'] and r[f'{d}: Sharpe'] > m[f'{d}: Sharpe']
+                  for d in ('Geliştirme (2015-2020)', 'Sınama (2021 sonrası)'))
+        yarim = any(r[f'{d}: yıllık getiri'] > m[f'{d}: yıllık getiri']
+                    for d in ('Geliştirme (2015-2020)', 'Sınama (2021 sonrası)'))
+        karar.append('Gerçek iyileşme' if iyi else ('Karışık sonuç' if yarim else 'İyileşme yok'))
+    kars['Karar (mevcut sisteme göre)'] = karar
+
+    yillik = pd.DataFrame({k: (1 + v.fillna(0)).groupby(v.index.year).prod() - 1
+                           for k, v in egriler.items() if k.endswith('Aylık')})
+    if spy is not None:
+        yillik['S&P 500 (SPY)'] = (1 + spy.fillna(0)).groupby(spy.index.year).prod() - 1
+    yillik.index.name = 'Yıl'
+    # Her versiyonun bugünkü (son tarih) seçimi
+    son_tarih = max(puan['tarih'])
+    bugun = pd.DataFrame({vad: pd.Series(l.get(son_tarih, [])) for vad, l in secimler.items()})
+
+    aciklama = pd.DataFrame({'Bu dosya': [
+        'Her versiyon, her dönem ADAY çıkan hisseler arasından puanı en yüksek 10 hisseyi eşit ağırlıkla tutar; '
+        'listeden çıkan satılır. İşlem bir hafta gecikmeyle yapılır, her alım ve satımda maliyet düşülür.',
+        '1) Kalite ve geri alım ağırlıklı: puan ağırlıkları ucuzluk %25, kalite %45, sağlamlık %10, büyüme %20 '
+        '(büyüme puanının içinde hisse adedini azaltma, yani geri alım var).',
+        '2) Sektör sınırı: ilk 10\'da aynı sektörden en fazla 2 hisse. Bütün perakende (SIC 52-59) tek sektör sayılır.',
+        '3) Trend filtresi: son 12 ayda %30\'dan fazla düşmüş hisse aday listesine alınmaz (değer tuzağı önlemi).',
+        'Karar: bir versiyon ancak hem 2015-2020 hem 2021 sonrası dönemde, aynı sıklıkta, mevcut sistemden hem '
+        'daha yüksek getiri hem daha yüksek Sharpe verdiyse "Gerçek iyileşme" sayılır.',
+        'Geçmiş performans gelecek için garanti değildir. Bu dosya yatırım tavsiyesi değildir.']})
+    with pd.ExcelWriter(os.path.join(CIKTI, 'varyant_testi.xlsx'), engine='openpyxl') as w:
+        for ad, df in [('Karşılaştırma', kars), ('Yıllık (aylık değişim)', yillik.reset_index()),
+                       ('Bugünkü seçimler', bugun), ('Açıklama', aciklama)]:
+            df.to_excel(w, sheet_name=ad, index=False)
+            ws = w.sheets[ad]
+            for j, c in enumerate(df.columns, 1):
+                ws.column_dimensions[ws.cell(row=1, column=j).column_letter].width = max(12, min(60, len(str(c)) + 4))
+                if df[c].dtype.kind == 'f':
+                    fmt = '0.00' if ('Sharpe' in str(c) or 'hacmi' in str(c) or 'sayısı' in str(c)) else '0.0%'
+                    for i in range(2, len(df) + 2):
+                        ws.cell(row=i, column=j).number_format = fmt
+            if ad == 'Açıklama':
+                ws.column_dimensions['A'].width = 140
+    print(kars.round(3).to_string())
+    return {'karsilastirma': kars, 'yillik': yillik}
 
 
 # ---------------------------------------------------------------- aday listesinin iç analizi
@@ -862,7 +1001,7 @@ def _grafik(fig):
     return '<img src="data:image/png;base64,' + base64.b64encode(tampon.getvalue()).decode() + '" style="max-width:100%">'
 
 
-def rapor_yaz(ozet, yillik, egri, dilim, bilgi, analiz=None):
+def rapor_yaz(ozet, yillik, egri, dilim, bilgi, analiz=None, varyant=None):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -898,6 +1037,14 @@ def rapor_yaz(ozet, yillik, egri, dilim, bilgi, analiz=None):
                     df[c] = df[c].map(lambda v: '' if pd.isna(v) else f'{v:.2f}')
         return df.to_html(border=0, classes='t')
 
+    varyant_html = ''
+    if varyant is not None:
+        v = varyant['karsilastirma']
+        v = v[v['Sıklık'] == 'Aylık'].set_index('Versiyon').drop(columns=['Sıklık'])
+        varyant_html = ('<h2>İyileştirme denemeleri (en iyi 10 aday, aylık)</h2><p>Kurallar 2015-2020 dönemine göre '
+                        'düşünüldü; 2021 ve sonrası hiç dokunulmamış sınama dönemidir. Bir değişiklik ancak iki dönemde de '
+                        'mevcut sistemden iyiyse gerçek iyileşme sayılır. Ayrıntılar varyant_testi.xlsx dosyasında.</p>'
+                        + tablo(v, [c for c in v.columns if 'getiri' in c or 'düşüş' in c or 'Oynaklık' in c]))
     analiz_html = ''
     if analiz:
         analiz_html = ('<h2>Aday listesinin içi: ilk 10 gerçekten en iyisi mi?</h2>'
@@ -918,6 +1065,7 @@ table.t th{{background:#1F3864;color:#fff}}.uyari{{background:#FFF4E5;padding:8p
 <h2>Özet</h2>{tablo(ozet.set_index('Strateji'), yuzdeler)}
 <h2>Büyüme eğrileri</h2>{g1}
 <h2>Puanın öngörü gücü</h2><p>Her ay sonunda evrendeki hisseler toplam puana göre beş eşit gruba bölündü. Puan işe yarıyorsa 5. grubun getirisi 1. gruptan belirgin şekilde yüksek olmalı.</p>{g2}{tablo(dilim)}
+{varyant_html}
 {analiz_html}
 <h2>Yıllara göre getiri</h2>{tablo(yillik)}
 <p style="color:#777;font-size:12px">Geçmiş performans gelecek için garanti değildir. Bu test yatırım tavsiyesi değildir.</p>
