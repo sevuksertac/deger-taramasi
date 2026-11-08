@@ -30,7 +30,7 @@ VERI_SUTUNLARI = [
     'varlik', 'yukumluluk', 'ozkaynak', 'donenVarlik', 'kvYukumluluk', 'nakit', 'borc', 'gecmisKar', 'hisseAdedi',
     'satisFY', 'satisFY1', 'netKarFY', 'netKarFY1', 'varlikFY', 'varlikFY1', 'inaFY',
     'uvBorcFY', 'uvBorcFY1', 'donenFY', 'donenFY1', 'kvYukFY', 'kvYukFY1',
-    'hisseFY', 'hisseFY1', 'brutKarFY', 'brutKarFY1', 'not', 'guncelleme', 'endeks',
+    'hisseFY', 'hisseFY1', 'brutKarFY', 'brutKarFY1', 'not', 'guncelleme', 'endeks', 'trend',
 ]
 
 ETIKET = {
@@ -445,6 +445,52 @@ def zipten_oku(z, cik):
         return None
 
 
+def trend_durumu(kapanis):
+    """Haftalık kapanışlardan teknik trend: 40 hafta (~200 gün) ve 10 hafta (~50 gün) ortalaması.
+    Yükseliş: fiyat 40 haftalık ortalamanın üzerinde VE 10 haftalık ortalama 40 haftalığın üzerinde.
+    Düşüş: ikisinin de tersi. Diğer durumlar: Yatay."""
+    k = [x for x in kapanis if x is not None and x == x and x > 0]
+    if len(k) < 40:
+        return ''
+    o40 = sum(k[-40:]) / 40
+    o10 = sum(k[-10:]) / 10
+    son = k[-1]
+    if son > o40 and o10 > o40:
+        return 'Yükseliş'
+    if son < o40 and o10 < o40:
+        return 'Düşüş'
+    return 'Yatay'
+
+
+def trend_hesapla(tickerlar):
+    """Yahoo Finance'ten son ~15 ayın haftalık kapanışları; yfinance kurulu değilse trend boş kalır."""
+    try:
+        import yfinance as yf
+    except ImportError:
+        print('Uyarı: yfinance kurulu değil, trend hesaplanmadı.')
+        return {}
+    sonuc = {}
+    tickerlar = sorted(set(t for t in tickerlar if t))
+    for i in range(0, len(tickerlar), 200):
+        grup = tickerlar[i:i + 200]
+        try:
+            d = yf.download(grup, period='15mo', interval='1wk', auto_adjust=True, group_by='column',
+                            threads=True, progress=False)
+            kap = d['Close'] if 'Close' in d.columns.get_level_values(0) else None
+        except Exception as e:
+            print(f'Uyarı: trend fiyatları alınamadı ({e})')
+            continue
+        if kap is None:
+            continue
+        if not hasattr(kap, 'columns'):
+            kap = kap.to_frame(grup[0])
+        for t in grup:
+            if t in kap.columns:
+                sonuc[t] = trend_durumu(list(kap[t].dropna()))
+    print(f'Trend hesaplandı: {sum(1 for v in sonuc.values() if v)} hisse')
+    return sonuc
+
+
 def main():
     ua = os.environ.get('SEC_UA', '').strip()
     if '@' not in ua:
@@ -529,6 +575,10 @@ def main():
         satirlar.append(r)
         if n % 100 == 0:
             print(f'{n}/{len(evren)} işlendi')
+
+    trendler = trend_hesapla([r['ticker'] for r in satirlar])
+    for r in satirlar:
+        r['trend'] = trendler.get(r['ticker'], '')
 
     with open('veri.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)

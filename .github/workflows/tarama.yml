@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 4 * * 1'   # Her pazartesi 04:00 UTC = 07:00 Türkiye saati
   workflow_dispatch:       # Actions sekmesinden elle çalıştırmak için
+  push:                    # Kod değişince otomatik çalışır
+    branches: [main]
+    paths: ['tarama.py', '.github/workflows/tarama.yml', 'tickers.txt']
 
 permissions:
   contents: write
@@ -17,6 +20,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Paketleri kur
+        run: pip install yfinance
       - name: SEC verilerini cek
         env:
           SEC_UA: ${{ vars.SEC_UA }}
