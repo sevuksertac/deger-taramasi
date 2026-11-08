@@ -398,6 +398,8 @@ def puanla(df):
     uyari['eksik'] = df['not'].fillna('').astype(str) != ''
     out['uyari'] = uyari.sum(axis=1)
     out['aday'] = (out['toplam'] >= MIN_TOPLAM) & (out['ucuzluk'].fillna(0) >= MIN_UCUZLUK) & (out['uyari'] <= IZINLI_UYARI)
+    for k in y.columns:  # tek tek kriterlerin yüzdelikleri (hangi kriterin işe yaradığı analizi için)
+        out['y_' + k] = y[k]
     return out
 
 
@@ -603,7 +605,15 @@ def main():
     def gecikmeli(liste_sozluk, tarihler):
         return {sonraki[t]: liste_sozluk.get(t, []) for t in tarihler if t in sonraki}
 
+    en_iyi10 = (puan[puan['aday']].sort_values('toplam', ascending=False).groupby('tarih').head(10)
+                .groupby('tarih')['ticker'].apply(list).to_dict())
     for ad, tarihler in siklik.items():
+        pg10, hacim10, adet10 = simule_et(getiri, gecikmeli(en_iyi10, tarihler))
+        egriler[f'En iyi 10 aday - {ad}'] = pg10
+        o10 = olcumler(pg10, hacim10, adet10)
+        if spy is not None:
+            o10['SPY\'yi geçtiği hafta oranı'] = float((pg10 > spy).mean())
+        ozet.append({'Strateji': f'En iyi 10 aday - {ad}', **o10})
         hedef = gecikmeli(aday_listesi, tarihler)
         pg, hacim, adet = simule_et(getiri, hedef)
         egriler[f'Adaylar - {ad}'] = pg
@@ -652,6 +662,8 @@ def main():
     dilim_ozet.index.name = 'Puan dilimi'
     dilim_ozet.to_csv(os.path.join(CIKTI, 'dilimler.csv'))
 
+    analiz = aday_analizi(puan, aylik_getiri)
+
     bilgi = {
         'calisma': datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC'),
         'donem': f'{haftalar[0].date()} - {getiri.index[-1].date()}',
@@ -660,9 +672,187 @@ def main():
     }
     with open(os.path.join(CIKTI, 'bilgi.json'), 'w', encoding='utf-8') as f:
         json.dump(bilgi, f, ensure_ascii=False, indent=1)
-    rapor_yaz(ozet_df, yillik_df, egri_df, dilim_ozet, bilgi)
+    rapor_yaz(ozet_df, yillik_df, egri_df, dilim_ozet, bilgi, analiz)
     print(ozet_df.to_string())
     print(f'Bitti: {bilgi["sure_dk"]} dk')
+
+
+# ---------------------------------------------------------------- aday listesinin iç analizi
+KRITER_ADI = {
+    'toplam': 'Toplam puan', 'ucuzluk': 'Ucuzluk puanı', 'kalite': 'Kalite puanı', 'saglamlik': 'Sağlamlık puanı',
+    'buyume': 'Büyüme puanı', 'y_ebit_fd': 'Faaliyet kârı / FD', 'y_sna_get': 'Serbest nakit akışı getirisi',
+    'y_kar_get': 'Kâr getirisi (1/FK)', 'y_dd_pd': 'Defter / piyasa (finansal)', 'y_roce': 'Sermaye getirisi (ROCE)',
+    'y_brut_karlilik': 'Brüt kârlılık', 'y_nakit_donusum': 'Nakit dönüşümü', 'y_roe': 'Özkaynak kârlılığı (finansal)',
+    'y_piotroski': 'Piotroski skoru', 'y_netborc_favok': 'Düşük net borç / FAVÖK', 'y_faiz_karsilama': 'Faiz karşılama',
+    'y_altman': 'Altman Z', 'y_ozk_varlik': 'Özkaynak / varlık (finansal)', 'y_satis_buyume': 'Satış büyümesi',
+    'y_hbk_buyume': 'Hisse başı kâr büyümesi', 'y_hisse_degisim': 'Hisse adedini azaltma (geri alım)',
+}
+SIRA_DILIMI = [(1, 10, '1-10'), (11, 25, '11-25'), (26, 50, '26-50'), (51, 10 ** 6, '51 ve sonrası')]
+
+
+def _yilliklastir(aylik):
+    aylik = aylik.dropna()
+    return (1 + aylik).prod() ** (12 / len(aylik)) - 1 if len(aylik) else np.nan
+
+
+def aday_analizi(puan, aylik_getiri):
+    """Her ay sonundaki aday listesini sırasıyla birlikte sonraki ayın getirisiyle eşleştirir."""
+    parcalar, evren_parcalar = [], []
+    for a, g in aylik_getiri.items():
+        p = puan[(puan['tarih'] == a) & puan['toplam'].notna()].copy()
+        if p.empty:
+            continue
+        p['getiri_1ay'] = p['ticker'].map(g)
+        p['spy_1ay'] = g.get('SPY', np.nan)
+        evren_parcalar.append(p)
+        ad = p[p['aday']].copy()
+        if ad.empty:
+            continue
+        ad['sira'] = ad['toplam'].rank(ascending=False, method='first').astype(int)
+        parcalar.append(ad)
+    if not parcalar:
+        return None
+    ad = pd.concat(parcalar)
+    ad = ad[ad['getiri_1ay'].notna()].copy()
+    evren = pd.concat(evren_parcalar)
+    evren = evren[evren['getiri_1ay'].notna()]
+    ad['spy_farki'] = ad['getiri_1ay'] - ad['spy_1ay']
+    ad['ilk_10'] = ad['sira'] <= 10
+    g = ad.groupby('tarih')['getiri_1ay']
+    ad['z'] = (ad['getiri_1ay'] - g.transform('mean')) / g.transform('std')
+    # Beklenmedik: o ayki diğer adaylardan çok farklı (2,5 standart sapma) ya da bir ayda %25'ten fazla hareket
+    ad['beklenmedik'] = (ad['z'].abs() > 2.5) | (ad['getiri_1ay'].abs() > 0.25)
+
+    # Sıra dilimleri
+    sira_kayit = []
+    for bas, son, etiket in SIRA_DILIMI:
+        d = ad[(ad['sira'] >= bas) & (ad['sira'] <= son)]
+        if d.empty:
+            continue
+        aylik = d.groupby('tarih')['getiri_1ay'].mean()
+        temiz = d[~d['beklenmedik']].groupby('tarih')['getiri_1ay'].mean()
+        spy = d.groupby('tarih')['spy_1ay'].first()
+        sira_kayit.append({'Aday sırası': etiket, 'Yıllık getiri': _yilliklastir(aylik),
+                           'Beklenmedik aylar hariç yıllık getiri': _yilliklastir(temiz),
+                           'SPY\'yi geçtiği ay oranı': float((aylik > spy.reindex(aylik.index)).mean()),
+                           'Ortalama aylık SPY farkı': float((aylik - spy.reindex(aylik.index)).mean()),
+                           'Ortalama hisse sayısı': float(d.groupby('tarih').size().mean())})
+    sira = pd.DataFrame(sira_kayit)
+
+    # Hangi kriter işe yarıyor: her ay kriter sıralaması ile sonraki ayın getiri sıralaması arasındaki ilişki
+    def ic_tablosu(veri):
+        kayit = []
+        for k, ad_ in KRITER_ADI.items():
+            if k not in veri.columns:
+                continue
+            ic = veri.groupby('tarih').apply(
+                lambda x: x[k].rank().corr(x['getiri_1ay'].rank()) if x[k].notna().sum() >= 8 else np.nan,
+                include_groups=False).dropna()
+            if len(ic) < 6:
+                continue
+            kayit.append({'Kriter': ad_, 'Ortalama ilişki (IC)': ic.mean(),
+                          't değeri': ic.mean() / (ic.std() / math.sqrt(len(ic))) if ic.std() > 0 else np.nan,
+                          'Pozitif ay oranı': float((ic > 0).mean()), 'Ay sayısı': len(ic)})
+        kolonlar = ['Kriter', 'Ortalama ilişki (IC)', 't değeri', 'Pozitif ay oranı', 'Ay sayısı']
+        if not kayit:
+            return pd.DataFrame(columns=kolonlar)
+        return pd.DataFrame(kayit, columns=kolonlar).sort_values('Ortalama ilişki (IC)', ascending=False)
+    kriter = ic_tablosu(ad)
+    kriter_evren = ic_tablosu(evren)
+
+    # Hisse bazında: aday listesindeyken en çok kazandıranlar
+    hisse = ad.groupby('ticker').agg(
+        aday_ay=('getiri_1ay', 'size'), ilk10_ay=('ilk_10', 'sum'), ort_sira=('sira', 'mean'),
+        ort_aylik=('getiri_1ay', 'mean'), birlesik=('getiri_1ay', lambda r: (1 + r).prod() - 1),
+        ort_spy_farki=('spy_farki', 'mean'), beklenmedik_ay=('beklenmedik', 'sum'),
+        endeks=('endeks', 'last')).reset_index()
+    hisse = hisse.sort_values('birlesik', ascending=False)
+    hisse.columns = ['Hisse', 'Aday olduğu ay', 'İlk 10\'da olduğu ay', 'Ortalama sıra', 'Ortalama aylık getiri',
+                     'Aday iken birleşik getiri', 'Ortalama aylık SPY farkı', 'Beklenmedik ay sayısı', 'Endeks']
+
+    # Beklenmedik hareketler
+    bek = ad[ad['beklenmedik']].copy()
+    bek['Yön'] = np.where(bek['getiri_1ay'] > 0, 'Yükseliş', 'Düşüş')
+    bek = bek.reindex(bek['getiri_1ay'].abs().sort_values(ascending=False).index)
+    bek = bek[['tarih', 'ticker', 'endeks', 'sira', 'ilk_10', 'toplam', 'getiri_1ay', 'spy_1ay', 'z', 'Yön']]
+    bek.columns = ['Ay sonu', 'Hisse', 'Endeks', 'Aday sırası', 'İlk 10', 'Toplam puan', 'Sonraki ay getirisi',
+                   'SPY sonraki ay', 'Sapma (z)', 'Yön']
+    bek['Not'] = 'Habere veya şirkete özel bir olaya bağlı olabilir; o ayki haberlere bak.'
+
+    # Sonuç beklenmedik hareketlere ne kadar bağlı
+    ilk10 = ad[ad['ilk_10']]
+    ilk10_tum = ilk10.groupby('tarih')['getiri_1ay'].mean()
+    ilk10_temiz = ilk10[~ilk10['beklenmedik']].groupby('tarih')['getiri_1ay'].mean()
+    tum_tum = ad.groupby('tarih')['getiri_1ay'].mean()
+    spy_ay = ad.groupby('tarih')['spy_1ay'].first()
+    en_iyi5 = hisse.head(5)['Hisse'].tolist()
+    ilk10_en_iyi5_haric = ilk10[~ilk10['ticker'].isin(en_iyi5)].groupby('tarih')['getiri_1ay'].mean()
+    bagimlilik = pd.DataFrame([
+        ('İlk 10 aday: yıllık getiri', _yilliklastir(ilk10_tum)),
+        ('İlk 10 aday: beklenmedik aylar çıkarılınca', _yilliklastir(ilk10_temiz)),
+        ('İlk 10 aday: en çok kazandıran 5 hisse çıkarılınca', _yilliklastir(ilk10_en_iyi5_haric)),
+        ('Bütün adaylar: yıllık getiri', _yilliklastir(tum_tum)),
+        ('S&P 500 (SPY): yıllık getiri', _yilliklastir(spy_ay)),
+        ('Beklenmedik hareket oranı (aday-ay)', float(ad['beklenmedik'].mean())),
+        ('Beklenmedik hareketlerde yükseliş payı', float((ad.loc[ad['beklenmedik'], 'getiri_1ay'] > 0).mean())
+         if ad['beklenmedik'].any() else np.nan),
+    ], columns=['Ölçüm', 'Değer'])
+
+    detay = ad[['tarih', 'ticker', 'endeks', 'sira', 'ilk_10', 'toplam', 'ucuzluk', 'kalite', 'saglamlik', 'buyume',
+                'getiri_1ay', 'spy_1ay', 'spy_farki', 'beklenmedik']].sort_values(['tarih', 'sira'])
+    detay.columns = ['Ay sonu', 'Hisse', 'Endeks', 'Aday sırası', 'İlk 10', 'Toplam puan', 'Ucuzluk', 'Kalite',
+                     'Sağlamlık', 'Büyüme', 'Sonraki ay getirisi', 'SPY sonraki ay', 'SPY farkı', 'Beklenmedik']
+
+    sonuc = {'bagimlilik': bagimlilik, 'sira': sira, 'kriter': kriter, 'kriter_evren': kriter_evren,
+             'hisse': hisse, 'beklenmedik': bek, 'detay': detay}
+    excel_yaz(sonuc, os.path.join(CIKTI, 'aday_analizi.xlsx'))
+    return sonuc
+
+
+def excel_yaz(a, yol):
+    aciklama = pd.DataFrame({'Bu dosya': [
+        'Her ay sonunda ADAY çıkan hisseler toplam puana göre sıralandı (1 = en yüksek puan) ve bir hafta gecikmeyle '
+        'sonraki ayın getirisi ölçüldü.',
+        'Sıra dilimleri: ilk 10 aday gerçekten daha çok kazandırmış mı?',
+        'Hangi kriter işe yarıyor: her kriterin sıralaması ile sonraki ayın getiri sıralaması arasındaki ortalama ilişki '
+        '(IC). 0 = ilişki yok, 0,05 ve üzeri hisse seçiminde anlamlı kabul edilir. t değeri 2\'nin üzerindeyse sonuç '
+        'şansa bağlı olmayabilir.',
+        'Beklenmedik hareketler: o ay diğer adaylardan çok farklı hareket eden ya da bir ayda %25\'ten fazla oynayan '
+        'hisseler. Sebep (haber, bilanço sürprizi, satın alma) bu analizde bilinmez; o ayki haberlere bakmak gerekir.',
+        'Geçmiş performans gelecek için garanti değildir. Bu dosya yatırım tavsiyesi değildir.']})
+    sayfalar = [('Özet', a['bagimlilik']), ('Sıra dilimleri', a['sira']),
+                ('Hangi kriter işe yarıyor', a['kriter']), ('Kriterler - bütün evren', a['kriter_evren']),
+                ('En çok kazandıranlar', a['hisse']), ('Beklenmedik hareketler', a['beklenmedik']),
+                ('Tüm aday ayları', a['detay']), ('Açıklama', aciklama)]
+    yuzde_kelime = ('getiri', 'oranı', 'farkı', 'Değer', 'puan', 'Ucuzluk', 'Kalite', 'Sağlamlık', 'Büyüme',
+                    'SPY sonraki', 'SPY farkı')
+    with pd.ExcelWriter(yol, engine='openpyxl') as w:
+        for ad, df in sayfalar:
+            df = df.copy()
+            for c in df.columns:
+                if str(df[c].dtype).startswith('datetime'):
+                    df[c] = df[c].dt.date
+            df.to_excel(w, sheet_name=ad, index=False)
+            ws = w.sheets[ad]
+            for j, c in enumerate(df.columns, 1):
+                harf = ws.cell(row=1, column=j).column_letter
+                ws.column_dimensions[harf].width = max(12, min(60, len(str(c)) + 4))
+                if ad == 'Özet' and c == 'Değer':
+                    fmt = '0.0%'
+                elif c in ('Ortalama ilişki (IC)',):
+                    fmt = '0.000'
+                elif c in ('t değeri', 'Sapma (z)', 'Ortalama sıra', 'Ortalama hisse sayısı'):
+                    fmt = '0.00'
+                elif any(k in str(c) for k in yuzde_kelime) and df[c].dtype.kind == 'f':
+                    fmt = '0.0%'
+                else:
+                    fmt = None
+                if fmt:
+                    for i in range(2, len(df) + 2):
+                        ws.cell(row=i, column=j).number_format = fmt
+            ws.freeze_panes = 'B2'
+            if ad == 'Açıklama':
+                ws.column_dimensions['A'].width = 140
 
 
 # ---------------------------------------------------------------- rapor
@@ -672,7 +862,7 @@ def _grafik(fig):
     return '<img src="data:image/png;base64,' + base64.b64encode(tampon.getvalue()).decode() + '" style="max-width:100%">'
 
 
-def rapor_yaz(ozet, yillik, egri, dilim, bilgi):
+def rapor_yaz(ozet, yillik, egri, dilim, bilgi, analiz=None):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -708,6 +898,15 @@ def rapor_yaz(ozet, yillik, egri, dilim, bilgi):
                     df[c] = df[c].map(lambda v: '' if pd.isna(v) else f'{v:.2f}')
         return df.to_html(border=0, classes='t')
 
+    analiz_html = ''
+    if analiz:
+        analiz_html = ('<h2>Aday listesinin içi: ilk 10 gerçekten en iyisi mi?</h2>'
+                       '<p>Ayrıntılar aday_analizi.xlsx dosyasında.</p>' + tablo(analiz['bagimlilik'].set_index('Ölçüm'), ['Değer'])
+                       + '<h3>Aday sırasına göre sonraki ayın getirisi</h3>'
+                       + tablo(analiz['sira'].set_index('Aday sırası'), ['Yıllık getiri', 'Beklenmedik aylar hariç yıllık getiri',
+                                                                      'SPY\'yi geçtiği ay oranı', 'Ortalama aylık SPY farkı'])
+                       + '<h3>Hangi kriter sonraki ayın getirisini öngörüyor (adaylar arasında)</h3>'
+                       + tablo(analiz['kriter'].head(10).set_index('Kriter'), ['Pozitif ay oranı']))
     yuzdeler = ['Yıllık getiri', 'Oynaklık (yıllık)', 'En büyük düşüş', 'Toplam getiri', 'SPY\'yi geçtiği hafta oranı']
     html = f"""<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>Geriye dönük test</title>
 <style>body{{font-family:Arial;max-width:1000px;margin:24px auto;color:#222}}
@@ -719,6 +918,7 @@ table.t th{{background:#1F3864;color:#fff}}.uyari{{background:#FFF4E5;padding:8p
 <h2>Özet</h2>{tablo(ozet.set_index('Strateji'), yuzdeler)}
 <h2>Büyüme eğrileri</h2>{g1}
 <h2>Puanın öngörü gücü</h2><p>Her ay sonunda evrendeki hisseler toplam puana göre beş eşit gruba bölündü. Puan işe yarıyorsa 5. grubun getirisi 1. gruptan belirgin şekilde yüksek olmalı.</p>{g2}{tablo(dilim)}
+{analiz_html}
 <h2>Yıllara göre getiri</h2>{tablo(yillik)}
 <p style="color:#777;font-size:12px">Geçmiş performans gelecek için garanti değildir. Bu test yatırım tavsiyesi değildir.</p>
 </body></html>"""
