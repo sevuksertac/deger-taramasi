@@ -425,7 +425,7 @@ def simule_et(getiri, hedefler, maliyet=ISLEM_MALIYETI):
         hacim.append(islem)
         adet.append(len(agirlik))
         if len(agirlik):  # fiyat hareketiyle ağırlıklar kayar
-            deger = agirlik * (1 + r)
+            deger = agirlik * (1 + r).clip(lower=0)
             agirlik = deger / deger.sum() if deger.sum() > 0 else deger
     return pd.Series(pg, index=getiri.index), pd.Series(hacim, index=getiri.index), pd.Series(adet, index=getiri.index)
 
@@ -534,6 +534,9 @@ def main():
     print(f'{len(tickerlar)} hissenin fiyatları indiriliyor...')
     kap, duz, bol = fiyatlari_indir(tickerlar, (pd.Timestamp(BASLANGIC) - pd.Timedelta(days=10)).strftime('%Y-%m-%d'))
     kap_h, duz_h = haftalik(kap).reindex(haftalar), haftalik(duz).reindex(haftalar)
+    # Yahoo'nun düzeltilmiş fiyatları bazı hisselerde eski tarihler için sıfır veya negatif çıkabiliyor: at
+    kap_h = kap_h.where(kap_h > 0)
+    duz_h = duz_h.where(duz_h > 0)
     carpan = bolunme_carpani(bol, haftalar) if not bol.empty else pd.DataFrame(1.0, index=haftalar, columns=kap_h.columns)
     fiyatsiz = [t for t in tickerlar if t not in duz_h.columns or duz_h[t].notna().sum() == 0]
     if fiyatsiz:
@@ -570,7 +573,13 @@ def main():
 
     # Haftalık getiriler: t'den bir sonraki haftaya
     getiri = duz_h.pct_change(fill_method=None).shift(-1)
-    getiri = getiri.iloc[:-1]
+    getiri = getiri.iloc[:-1].replace([np.inf, -np.inf], np.nan)
+    # Bir haftada %99'dan fazla kayıp veya %300'den fazla kazanç neredeyse her zaman veri hatasıdır
+    supheli = (getiri <= -0.99) | (getiri >= 3.0)
+    if int(supheli.sum().sum()):
+        uyarilar.append(f'Fiyat verisindeki {int(supheli.sum().sum())} şüpheli haftalık hareket (bir haftada '
+                        f'%99 kayıp veya %300 kazançtan fazlası) veri hatası sayılıp hesaba katılmadı.')
+    getiri = getiri.where(~supheli)
 
     # Değişim sıklıkları
     hafta_idx = pd.Series(getiri.index, index=getiri.index)
@@ -624,7 +633,8 @@ def main():
     aylik_getiri = {}
     for a, b in zip(aylik[:-1], aylik[1:]):
         if a in sonraki and b in sonraki:  # yine bir hafta gecikmeyle
-            aylik_getiri[a] = duz_h.loc[sonraki[b]] / duz_h.loc[sonraki[a]] - 1
+            donem = getiri.loc[sonraki[a]:sonraki[b]].iloc[:-1]
+            aylik_getiri[a] = (1 + donem).prod(min_count=1) - 1
     dilim_kayit = []
     for a, g in aylik_getiri.items():
         p = puan[(puan['tarih'] == a) & puan['toplam'].notna()][['ticker', 'toplam']].copy()
