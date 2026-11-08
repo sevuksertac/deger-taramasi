@@ -12,6 +12,9 @@ import gzip
 import io
 import json
 import os
+import re
+import tempfile
+import zipfile
 import sys
 import time
 import urllib.error
@@ -26,7 +29,7 @@ VERI_SUTUNLARI = [
     'varlik', 'yukumluluk', 'ozkaynak', 'donenVarlik', 'kvYukumluluk', 'nakit', 'borc', 'gecmisKar', 'hisseAdedi',
     'satisFY', 'satisFY1', 'netKarFY', 'netKarFY1', 'varlikFY', 'varlikFY1', 'inaFY',
     'uvBorcFY', 'uvBorcFY1', 'donenFY', 'donenFY1', 'kvYukFY', 'kvYukFY1',
-    'hisseFY', 'hisseFY1', 'brutKarFY', 'brutKarFY1', 'not', 'guncelleme',
+    'hisseFY', 'hisseFY1', 'brutKarFY', 'brutKarFY1', 'not', 'guncelleme', 'endeks',
 ]
 
 ETIKET = {
@@ -36,6 +39,9 @@ ETIKET = {
     'brutKar': ['GrossProfit'],
     'satisMaliyeti': ['CostOfRevenue', 'CostOfGoodsAndServicesSold', 'CostOfGoodsSold'],
     'ebit': ['OperatingIncomeLoss'],
+    'vergiOncesi': ['IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest',
+                    'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments',
+                    'IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic'],
     'netKar': ['NetIncomeLoss', 'ProfitLoss', 'NetIncomeLossAvailableToCommonStockholdersBasic'],
     'amortisman': ['DepreciationDepletionAndAmortization', 'DepreciationAndAmortization',
                    'DepreciationAmortizationAndAccretionNet', 'Depreciation'],
@@ -190,6 +196,11 @@ def sirket_verisi_cikar(facts, sic=None):
     r['satisTTM'] = satis
     r['netKarTTM'] = net
     r['ebitTTM'] = ttm(facts, ETIKET['ebit'])[0]
+    if r['ebitTTM'] is None and not banka:
+        # Esas faaliyet kârını raporlamayan şirketler: vergi öncesi kâr + faiz gideri
+        vo = ttm(facts, ETIKET['vergiOncesi'])[0]
+        if vo is not None:
+            r['ebitTTM'] = vo + (ttm(facts, ETIKET['faiz'])[0] or 0)
     brut = ttm(facts, ETIKET['brutKar'])[0]
     if brut is None and satis is not None:
         maliyet = ttm(facts, ETIKET['satisMaliyeti'])[0]
@@ -273,22 +284,30 @@ def sirket_verisi_cikar(facts, sic=None):
 
 
 # ---------------------------------------------------------------- ağ
-def get_json(url, ua):
+def indir(url, ua, hedef=None):
+    """URL'yi indirir. hedef verilirse dosyaya yazar, yoksa içeriği döndürür."""
     req = urllib.request.Request(url, headers={'User-Agent': ua, 'Accept-Encoding': 'gzip'})
     for deneme in range(3):
         try:
-            with urllib.request.urlopen(req, timeout=60) as res:
+            with urllib.request.urlopen(req, timeout=300) as res:
+                gz = res.headers.get('Content-Encoding') == 'gzip'
+                if hedef:
+                    with open(hedef, 'wb') as f:
+                        while True:
+                            parca = res.read(1 << 20)
+                            if not parca:
+                                break
+                            f.write(parca)
+                    return hedef
                 veri = res.read()
-                if res.headers.get('Content-Encoding') == 'gzip':
-                    veri = gzip.decompress(veri)
-                return json.loads(veri)
+                return gzip.decompress(veri) if gz else veri
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return None
             if e.code in (429, 500, 502, 503) and deneme < 2:
                 time.sleep(5 * (deneme + 1))
                 continue
-            raise RuntimeError(f'SEC yanıt kodu {e.code} ({url})')
+            raise RuntimeError(f'Yanıt kodu {e.code} ({url})')
         except urllib.error.URLError:
             if deneme < 2:
                 time.sleep(5)
@@ -297,47 +316,157 @@ def get_json(url, ua):
     return None
 
 
+def get_json(url, ua):
+    veri = indir(url, ua)
+    return json.loads(veri) if veri else None
+
+
+# ---------------------------------------------------------------- evren
+SP500_URL = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+FACTS_ZIP = 'https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip'
+ADAY_SAYISI = int(os.environ.get('ADAY_SAYISI', '500'))
+
+
+def sp500_cek(ua):
+    """S&P 500 üyelerini Wikipedia'dan alır; alamazsa depodaki son listeyi kullanır."""
+    try:
+        html = indir(SP500_URL, ua).decode('utf-8')
+        tablo = html[html.index('id="constituents"'):]
+        tablo = tablo[:tablo.index('</table>')]
+        semboller = re.findall(r'<tr>\s*<td[^>]*>\s*(?:<a[^>]*>)?\s*([A-Z][A-Z0-9.\-]*)\s*<', tablo)
+        if len(semboller) < 450:
+            raise RuntimeError(f'beklenenden az sembol ({len(semboller)})')
+        with open('sp500.txt', 'w', encoding='utf-8') as f:
+            f.write('\n'.join(semboller) + '\n')
+        print(f'S&P 500 listesi Wikipedia\'dan alındı: {len(semboller)} sembol')
+        return semboller
+    except Exception as e:
+        print(f'Uyarı: S&P 500 listesi alınamadı ({e}); kayıtlı liste kullanılıyor.')
+        with open('sp500.txt', encoding='utf-8') as f:
+            return [s.strip() for s in f if s.strip()]
+
+
+def borsa_listesi(ua):
+    """NYSE ve Nasdaq'ta işlem gören hisseler: {ticker: (cik, ad)} ve {cik: ilk ticker}."""
+    j = get_json('https://www.sec.gov/files/company_tickers_exchange.json', ua)
+    alanlar = j['fields']
+    i_cik, i_ad, i_t, i_b = (alanlar.index(x) for x in ('cik', 'name', 'ticker', 'exchange'))
+    ticker_harita, cik_ticker = {}, {}
+    for r in j['data']:
+        if r[i_b] not in ('NYSE', 'Nasdaq'):
+            continue
+        cik = str(r[i_cik]).zfill(10)
+        t = str(r[i_t]).upper()
+        ticker_harita[t] = (cik, r[i_ad])
+        # Bir şirketin birden fazla sınıfı/tercihli hissesi olabilir: tire içermeyen ilk kodu tercih et
+        if cik not in cik_ticker or ('-' in cik_ticker[cik] and '-' not in t):
+            cik_ticker[cik] = t
+    return ticker_harita, cik_ticker
+
+
+def halka_acik_deger(facts):
+    """Şirketin raporladığı halka açık hisse değeri (USD): piyasa değerine yakın bir büyüklük ölçüsü."""
+    u = (((facts.get('facts') or {}).get('dei') or {}).get('EntityPublicFloat') or {}).get('units', {}).get('USD')
+    if not u:
+        return None
+    son = max(u, key=lambda f: (f['end'], f.get('filed', '')))
+    if son['end'] < (date.today() - timedelta(days=730)).isoformat():
+        return None  # iki yıldan eski: şirket artık rapor vermiyor olabilir
+    return son['val']
+
+
+def zipten_oku(z, cik):
+    try:
+        with z.open(f'CIK{cik}.json') as f:
+            return json.load(f)
+    except KeyError:
+        return None
+
+
 def main():
     ua = os.environ.get('SEC_UA', '').strip()
     if '@' not in ua:
         sys.exit('SEC_UA tanımlı değil. GitHub > Settings > Secrets and variables > Actions > Variables '
                  'altına SEC_UA adıyla "Ad Soyad eposta@ornek.com" ekle.')
-    with open('tickers.txt', encoding='utf-8') as f:
-        tickers = [t.strip().upper() for t in f if t.strip() and not t.startswith('#')]
 
-    harita_json = get_json('https://www.sec.gov/files/company_tickers.json', ua)
-    harita = {v['ticker'].upper(): (str(v['cik_str']).zfill(10), v['title']) for v in harita_json.values()}
-    time.sleep(BEKLEME)
+    ticker_harita, cik_ticker = borsa_listesi(ua)
+    sp = sp500_cek(ua)
+
+    ek = []
+    if os.path.exists('tickers.txt'):
+        with open('tickers.txt', encoding='utf-8') as f:
+            ek = [t.strip().upper() for t in f if t.strip() and not t.startswith('#')]
+
+    print('SEC toplu veri dosyası indiriliyor...')
+    zip_yolu = indir(FACTS_ZIP, ua, os.path.join(tempfile.gettempdir(), 'companyfacts.zip'))
+    z = zipfile.ZipFile(zip_yolu)
+
+    # 1) S&P 500 üyeleri (aynı şirketin iki hisse sınıfı varsa tek satır)
+    evren, gorulen = [], set()
+    for t in sp:
+        e = ticker_harita.get(t.replace('.', '-'))
+        if e and e[0] not in gorulen:
+            gorulen.add(e[0])
+            evren.append((t.replace('.', '-'), e[0], 'S&P 500'))
+
+    # 2) Endekse aday: endeks dışındaki, son 12 ayı kârlı en büyük şirketler
+    adaylar = []
+    for cik, t in cik_ticker.items():
+        if cik in gorulen:
+            continue
+        facts = zipten_oku(z, cik)
+        if not facts or 'us-gaap' not in (facts.get('facts') or {}):
+            continue
+        deger = halka_acik_deger(facts)
+        if not deger:
+            continue
+        net = ttm(facts, ETIKET['netKar'])[0]
+        if net is None or net <= 0:
+            continue  # S&P 500'e girmek için kâr şartı var
+        adaylar.append((deger, t, cik))
+    adaylar.sort(reverse=True)
+    for deger, t, cik in adaylar[:ADAY_SAYISI]:
+        gorulen.add(cik)
+        evren.append((t, cik, 'Aday'))
+    print(f'Endeks dışı uygun şirket: {len(adaylar)}, seçilen: {min(len(adaylar), ADAY_SAYISI)}')
+
+    # 3) tickers.txt'teki ek hisseler (portföyündekiler gibi)
+    for t in ek:
+        e = ticker_harita.get(t.replace('.', '-'))
+        if e and e[0] not in gorulen:
+            gorulen.add(e[0])
+            evren.append((t.replace('.', '-'), e[0], 'Ek liste'))
+        elif not e:
+            evren.append((t, None, 'Ek liste'))
 
     simdi = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
     satirlar = []
-    for t in tickers:
+    for n, (t, cik, endeks) in enumerate(evren, 1):
         r = {}
         try:
-            eslesme = harita.get(t.replace('.', '-'))
-            if not eslesme:
-                raise RuntimeError('SEC listesinde bulunamadı (ETF veya yabancı hisse olabilir)')
-            cik, ad = eslesme
-            sub = get_json(f'https://data.sec.gov/submissions/CIK{cik}.json', ua) or {}
-            time.sleep(BEKLEME)
-            facts = get_json(f'https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json', ua)
-            time.sleep(BEKLEME)
+            if not cik:
+                raise RuntimeError('NYSE/Nasdaq listesinde bulunamadı (ETF veya yabancı hisse olabilir)')
+            facts = zipten_oku(z, cik)
             if not facts:
                 raise RuntimeError('SEC finansal verisi yok')
+            sub = get_json(f'https://data.sec.gov/submissions/CIK{cik}.json', ua) or {}
+            time.sleep(BEKLEME)
             sic = sub.get('sic', '')
             r = sirket_verisi_cikar(facts, sic)
             r['cik'] = cik
             r['sic'] = sic
             r['sektor'] = sub.get('sicDescription', '')
-            r['sirket'] = sub.get('name') or r.get('sirket') or ad
+            r['sirket'] = sub.get('name') or r.get('sirket') or ticker_harita.get(t, ('', ''))[1]
             r['grup'] = 'Finansal' if finansal_mi(sic) else ('Diğer' if sic else '')
-            print(f'{t}: tamam ({r.get("kaynak", "")})')
         except Exception as e:  # bir hissenin hatası diğerlerini durdurmasın
             r = {'not': f'Hata: {e}'}
             print(f'{t}: {e}')
         r['ticker'] = t
         r['guncelleme'] = simdi
+        r['endeks'] = endeks
         satirlar.append(r)
+        if n % 100 == 0:
+            print(f'{n}/{len(evren)} işlendi')
 
     with open('veri.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
