@@ -551,6 +551,28 @@ def trend_hesapla(tickerlar):
     return sonuc
 
 
+def yahoo_hisse_adedi(tickerlar):
+    """SEC'te sınıfsız hisse adedi hiç olmayan şirketler (V, BRK-B gibi) için Yahoo Finance'in tüm sınıfları
+    kapsayan adedi (impliedSharesOutstanding = toplam piyasa değeri / fiyat)."""
+    if not tickerlar:
+        return {}
+    try:
+        import yfinance as yf
+    except ImportError:
+        return {}
+    sonuc = {}
+    for t in tickerlar:
+        try:
+            bilgi = yf.Ticker(t).info or {}
+            adet = bilgi.get('impliedSharesOutstanding') or bilgi.get('sharesOutstanding')
+            if adet and adet > 0:
+                sonuc[t] = float(adet)
+        except Exception as e:
+            print(f'Uyarı: {t} için Yahoo hisse adedi alınamadı ({e})')
+    print(f'Yahoo hisse adedi: {len(sonuc)}/{len(tickerlar)} ({", ".join(sorted(sonuc))})')
+    return sonuc
+
+
 def main():
     ua = os.environ.get('SEC_UA', '').strip()
     if '@' not in ua:
@@ -646,6 +668,12 @@ def main():
         satirlar.append(r)
         if n % 100 == 0:
             print(f'{n}/{len(evren)} işlendi')
+
+    eksik_adet = [r['ticker'] for r in satirlar if not r.get('hisseAdedi') and r.get('varlik')]
+    for t, adet in yahoo_hisse_adedi(eksik_adet).items():
+        r = next(x for x in satirlar if x['ticker'] == t)
+        r['hisseAdedi'] = adet
+        r['not'] = ((r.get('not') or '') + '; ' if r.get('not') else '') + "Hisse adedi Yahoo'dan (SEC'te sınıf bazında)"
 
     trendler = trend_hesapla([r['ticker'] for r in satirlar])
     for r in satirlar:
