@@ -551,26 +551,70 @@ def trend_hesapla(tickerlar):
     return sonuc
 
 
-def yahoo_hisse_adedi(tickerlar):
-    """SEC'te sınıfsız hisse adedi hiç olmayan şirketler (V, BRK-B gibi) için Yahoo Finance'in tüm sınıfları
-    kapsayan adedi (impliedSharesOutstanding = toplam piyasa değeri / fiyat)."""
-    if not tickerlar:
-        return {}
+PD_SAPMA = 0.25   # SEC'ten hesaplanan piyasa değeri Yahoo'dan bu oranda farklıysa hisse adedi Yahoo'ya göre düzeltilir
+FK_SAPMA = 0.35   # F/K bu oranda farklıysa "Kâr sapması" uyarısı (sheet'te ADAY olmayı engeller)
+EMTIA_SIC = '6221'  # altın/gümüş fonları (GLD, IAU, SLV...): şirket değil
+
+
+def _not_ekle(r, metin):
+    r['not'] = (r['not'] + '; ' + metin) if r.get('not') else metin
+
+
+def yahoo_denetle(satirlar):
+    """Her hisse için Yahoo Finance ile sağlama (MA olayı: SEC toplu dosyasındaki hisse adedi bazı şirketlerde
+    tek sınıf, bayat veya yanlış birimde geliyor):
+      - Yahoo'ya göre şirket değilse (ETF, fon) satır çıkarılır.
+      - Hisse adedi yoksa ya da SEC adediyle bulunan piyasa değeri Yahoo'nunkinden %25'ten fazla farklıysa,
+        hisse adedi Yahoo'nun piyasa değeri / fiyatından alınır (bilgi notu, uyarı değil).
+      - Düzeltmeden sonra F/K Yahoo'nunkinden %35'ten fazla farklıysa 'Kâr sapması' notu düşülür.
+    Yahoo'ya ulaşılamazsa satır olduğu gibi kalır."""
     try:
         import yfinance as yf
     except ImportError:
-        return {}
-    sonuc = {}
-    for t in tickerlar:
+        print('Uyarı: yfinance kurulu değil, Yahoo sağlaması yapılmadı.')
+        return satirlar
+    kalan, cikan, duzeltilen, sapma = [], [], [], []
+    for n, r in enumerate(satirlar, 1):
+        t = r['ticker']
+        if str(r.get('sic', '')) == EMTIA_SIC:
+            cikan.append(t)
+            continue
         try:
             bilgi = yf.Ticker(t).info or {}
-            adet = bilgi.get('impliedSharesOutstanding') or bilgi.get('sharesOutstanding')
-            if adet and adet > 0:
-                sonuc[t] = float(adet)
         except Exception as e:
-            print(f'Uyarı: {t} için Yahoo hisse adedi alınamadı ({e})')
-    print(f'Yahoo hisse adedi: {len(sonuc)}/{len(tickerlar)} ({", ".join(sorted(sonuc))})')
-    return sonuc
+            print(f'Uyarı: {t} Yahoo bilgisi alınamadı ({e})')
+            bilgi = {}
+        tur = bilgi.get('quoteType')
+        if tur and tur != 'EQUITY':
+            cikan.append(t)
+            continue
+        fiyat = bilgi.get('currentPrice') or bilgi.get('regularMarketPrice')
+        y_pd = bilgi.get('marketCap')
+        adet = r.get('hisseAdedi')
+        if fiyat and y_pd and fiyat > 0 and y_pd > 0:
+            y_adet = y_pd / fiyat
+            if not adet:
+                r['hisseAdedi'] = y_adet
+                _not_ekle(r, "Hisse adedi Yahoo'dan (SEC'te yok)")
+                duzeltilen.append(t)
+            elif abs(fiyat * adet / y_pd - 1) > PD_SAPMA:
+                _not_ekle(r, f"Hisse adedi Yahoo'ya göre düzeltildi (SEC adedi x{fiyat * adet / y_pd:.2f} çıkıyordu)")
+                r['hisseAdedi'] = y_adet
+                duzeltilen.append(t)
+        y_fk, net, adet = bilgi.get('trailingPE'), r.get('netKarTTM'), r.get('hisseAdedi')
+        if fiyat and y_fk and y_fk > 0 and net and net > 0 and adet:
+            fk = fiyat * adet / net
+            if abs(fk / y_fk - 1) > FK_SAPMA:
+                _not_ekle(r, f"Kâr sapması: F/K bizde {fk:.1f}, Yahoo'da {y_fk:.1f}")
+                sapma.append(t)
+        kalan.append(r)
+        if n % 200 == 0:
+            print(f'Yahoo sağlaması {n}/{len(satirlar)}')
+        time.sleep(0.1)
+    print(f'Yahoo sağlaması: {len(cikan)} şirket olmayan çıkarıldı ({", ".join(cikan)}); '
+          f'{len(duzeltilen)} hisse adedi düzeltildi ({", ".join(duzeltilen)}); '
+          f'{len(sapma)} kâr sapması ({", ".join(sapma)})')
+    return kalan
 
 
 def main():
@@ -669,11 +713,7 @@ def main():
         if n % 100 == 0:
             print(f'{n}/{len(evren)} işlendi')
 
-    eksik_adet = [r['ticker'] for r in satirlar if not r.get('hisseAdedi') and r.get('varlik')]
-    for t, adet in yahoo_hisse_adedi(eksik_adet).items():
-        r = next(x for x in satirlar if x['ticker'] == t)
-        r['hisseAdedi'] = adet
-        r['not'] = ((r.get('not') or '') + '; ' if r.get('not') else '') + "Hisse adedi Yahoo'dan (SEC'te sınıf bazında)"
+    satirlar = yahoo_denetle(satirlar)
 
     trendler = trend_hesapla([r['ticker'] for r in satirlar])
     for r in satirlar:

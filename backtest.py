@@ -676,6 +676,7 @@ def main():
             sic[c] = ''
         time.sleep(T.BEKLEME)
     g2 = pd.DataFrame(paralel(_gecis2, zip_yolu, gerekli, sic))
+    g2 = g2[g2['cik'].map(lambda c: str(sic.get(c, ''))) != T.EMTIA_SIC]  # altın/gümüş fonları şirket değil
     g2['acik'] = pd.to_datetime(g2['acik'])
     g2['grup'] = g2['cik'].map(lambda c: 'Finansal' if T.finansal_mi(sic.get(c)) else ('Diğer' if sic.get(c) else ''))
     print(f'  {len(g2)} rapor ({time.time() - t0:.0f} sn)')
