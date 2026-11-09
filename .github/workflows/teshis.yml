@@ -15,14 +15,8 @@ jobs:
           python - <<'P'
           import os, json, tarama as T
           ua = os.environ['SEC_UA']
-          for cik in ['0001403161', '0000773840', '0001666700', '0001067983']:
+          for cik, t in [('0001403161','V'), ('0001067983','BRK-B'), ('0000773840','HON'), ('0001141391','MA'), ('0000320193','AAPL'), ('0001166691','CMCSA'), ('0001754301','FOXA')]:
               f = json.loads(T.indir(f'https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json', ua))
-              d = f['facts']['dei'].get('EntityCommonStockSharesOutstanding', {}).get('units', {}).get('shares', [])
-              print('CIK', cik, f.get('entityName'))
-              for x in sorted(d, key=lambda x: x['end'])[-6:]: print('  DEI', x['end'], x['val'], x.get('filed'), x.get('form'))
-              g = f['facts']['us-gaap']
-              for tag in T.ETIKET['hisseSeyreltilmis'] + ['CommonStockSharesOutstanding']:
-                  u = g.get(tag, {}).get('units', {}).get('shares', [])
-                  for x in sorted(u, key=lambda x: x['end'])[-4:]: print('  ', tag[:40], x.get('start'), x['end'], x['val'], x.get('form'))
-              print('  secilen', T.son_seyreltilmis_adet(f))
+              b = T.son_bilanco_tarihi(f)
+              print('SONUC', t, b, f"{T.hisse_adedi(f, b)/1e6:,.1f} mn", 'seyreltilmis', T.son_seyreltilmis_adet(f))
           P

@@ -87,7 +87,9 @@ def _dei(facts, ad, birim):
 
 
 def hisse_adedi_kesimli(facts, kesim):
-    lst = [f for f in _dei(facts, 'EntityCommonStockSharesOutstanding', 'shares') if f.get('filed', '9') <= kesim]
+    bilanco = T.son_bilanco_tarihi(facts)
+    lst = [f for f in _dei(facts, 'EntityCommonStockSharesOutstanding', 'shares')
+           if f.get('filed', '9') <= kesim and T._taze(f, bilanco)]
     if lst:
         son = max(f['end'] for f in lst)
         ayni = [f for f in lst if f['end'] == son]

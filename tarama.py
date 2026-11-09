@@ -167,14 +167,30 @@ BERKSHIRE_CIK = 1067983   # raporlarını A sınıfı eşdeğeriyle verir; fiyat
 SINIF_ESIGI = 0.75        # kapak sayfası adedi son çeyreğin seyreltilmiş adedinin bu oranından azsa eksik sayılır
 
 
+TAZELIK_GUN = 400         # son bilançodan bu kadar eski hisse adedi bayat sayılır (bazı şirketler etiketlemeyi bırakmış)
+
+
+def _taze(f, bilanco):
+    return bilanco is None or gun_farki(f['end'], bilanco) <= TAZELIK_GUN
+
+
 def son_seyreltilmis_adet(facts):
-    """Gelir tablosundaki en son dönemin (tercihen çeyrek) seyreltilmiş ağırlıklı ortalama hisse adedi."""
-    lst = [f for f in olgular(facts, ETIKET['hisseSeyreltilmis'], 'shares') if f.get('start') and f.get('val')]
-    if not lst:
-        return None
-    son = max(f['end'] for f in lst)
-    ayni = [f for f in lst if f['end'] == son]
-    return min(ayni, key=lambda f: gun_farki(f['start'], f['end']))['val']
+    """En son dönemin (tercihen çeyrek) seyreltilmiş ağırlıklı ortalama hisse adedi. Etiket bayatsa
+    (V, BRK gibi yıllardır güncellenmeyenler) net kâr / hisse başı kârdan türetilir."""
+    bilanco = son_bilanco_tarihi(facts)
+    lst = [f for f in olgular(facts, ETIKET['hisseSeyreltilmis'], 'shares')
+           if f.get('start') and f.get('val') and _taze(f, bilanco)]
+    if lst:
+        son = max(f['end'] for f in lst)
+        ayni = [f for f in lst if f['end'] == son]
+        return min(ayni, key=lambda f: gun_farki(f['start'], f['end']))['val']
+    # Yedek: aynı döneme ait net kâr / hisse başı kâr
+    hbk = [f for f in olgular(facts, ['EarningsPerShareDiluted', 'EarningsPerShareBasic'], 'USD/shares')
+           if f.get('start') and f.get('val') and f['val'] > 0 and _taze(f, bilanco)]
+    kar = {(f['start'], f['end']): f['val'] for f in olgular(facts, ETIKET['netKar']) if f.get('start')}
+    adaylar = [(f['end'], -gun_farki(f['start'], f['end']), kar[(f['start'], f['end'])] / f['val'])
+               for f in hbk if kar.get((f['start'], f['end']), 0) > 0]
+    return max(adaylar)[2] if adaylar else None
 
 
 def hisse_dogrula(adet, facts):
@@ -195,6 +211,8 @@ def hisse_adedi(facts, tarih):
     dei = (((facts.get('facts') or {}).get('dei') or {})
            .get('EntityCommonStockSharesOutstanding') or {}).get('units', {}).get('shares')
     adet = None
+    bilanco = son_bilanco_tarihi(facts)
+    dei = [f for f in (dei or []) if _taze(f, bilanco)]
     if dei:
         son = max(f['end'] for f in dei)
         ayni = [f for f in dei if f['end'] == son]
