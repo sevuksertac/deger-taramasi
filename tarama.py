@@ -163,21 +163,48 @@ def borc(facts, tarih):
     return topla(uv, anlik(facts, ETIKET['borcKV'], tarih), anlik(facts, ETIKET['ticariSenet'], tarih))
 
 
+BERKSHIRE_CIK = 1067983   # raporlarını A sınıfı eşdeğeriyle verir; fiyatı kullanılan BRK-B, 1 A = 1500 B
+SINIF_ESIGI = 0.75        # kapak sayfası adedi son çeyreğin seyreltilmiş adedinin bu oranından azsa eksik sayılır
+
+
+def son_seyreltilmis_adet(facts):
+    """Gelir tablosundaki en son dönemin (tercihen çeyrek) seyreltilmiş ağırlıklı ortalama hisse adedi."""
+    lst = [f for f in olgular(facts, ETIKET['hisseSeyreltilmis'], 'shares') if f.get('start') and f.get('val')]
+    if not lst:
+        return None
+    son = max(f['end'] for f in lst)
+    ayni = [f for f in lst if f['end'] == son]
+    return min(ayni, key=lambda f: gun_farki(f['start'], f['end']))['val']
+
+
+def hisse_dogrula(adet, facts):
+    """Çok sınıflı şirketlerde (MA, V, CMCSA, NKE...) SEC toplu dosyası kapak sayfasındaki adedi çoğu zaman
+    yalnızca bir sınıf için verir; bu durumda piyasa değeri olduğundan düşük, hisse olduğundan ucuz görünür.
+    Kapak adedi son çeyreğin seyreltilmiş adedinin %75'inden azsa seyreltilmiş adet kullanılır. Bölünme sonrası
+    kapak adedi büyük çıkar; o durumda kapak adedi (güncel olan) korunur."""
+    dil = son_seyreltilmis_adet(facts)
+    if dil and (not adet or adet < SINIF_ESIGI * dil):
+        adet = dil
+    if adet and int(facts.get('cik') or 0) == BERKSHIRE_CIK:
+        adet = adet * 1500 if adet < 5e6 else adet   # A eşdeğeri -> B adedi
+    return adet
+
+
 def hisse_adedi(facts, tarih):
-    """Kapak sayfasındaki dolaşımdaki hisse sayısı; birden fazla hisse sınıfı varsa toplanır."""
+    """Kapak sayfasındaki dolaşımdaki hisse sayısı (sınıflar toplanır), seyreltilmiş adetle sağlaması yapılmış."""
     dei = (((facts.get('facts') or {}).get('dei') or {})
            .get('EntityCommonStockSharesOutstanding') or {}).get('units', {}).get('shares')
+    adet = None
     if dei:
         son = max(f['end'] for f in dei)
         ayni = [f for f in dei if f['end'] == son]
         en_yeni = max(f.get('filed', '') for f in ayni)
         toplam = sum(f['val'] for f in ayni if f.get('filed', '') == en_yeni)
         if toplam > 0:
-            return toplam
-    us = anlik(facts, ETIKET['hisseDolasim'], tarih, 'shares')
-    if us:
-        return us
-    return ttm(facts, ETIKET['hisseSeyreltilmis'], 'shares')[0]
+            adet = toplam
+    if not adet:
+        adet = anlik(facts, ETIKET['hisseDolasim'], tarih, 'shares')
+    return hisse_dogrula(adet, facts)
 
 
 def sirket_verisi_cikar(facts, sic=None):

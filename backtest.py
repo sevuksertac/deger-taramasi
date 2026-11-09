@@ -94,12 +94,10 @@ def hisse_adedi_kesimli(facts, kesim):
         en_yeni = max(f.get('filed', '') for f in ayni)
         toplam = sum(f['val'] for f in ayni if f.get('filed', '') == en_yeni)
         if toplam > 0:
-            return toplam
+            return T.hisse_dogrula(toplam, facts)   # çok sınıflı şirket sağlaması (kesim tarihine uyar)
     tarih = T.son_bilanco_tarihi(facts)
     us = T.anlik(facts, T.ETIKET['hisseDolasim'], tarih, 'shares') if tarih else None
-    if us:
-        return us
-    return T.ttm(facts, T.ETIKET['hisseSeyreltilmis'], 'shares')[0]
+    return T.hisse_dogrula(us, facts)
 
 
 def halka_acik_deger_kesimli(facts, kesim):
