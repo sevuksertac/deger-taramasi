@@ -1,0 +1,28 @@
+name: Teshis (gecici)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/teshis.yml']
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: '3.12'}
+      - env: {SEC_UA: '${{ vars.SEC_UA }}'}
+        run: |
+          python - <<'P'
+          import os, json, tarama as T
+          ua = os.environ['SEC_UA']
+          for cik in ['0001403161', '0000773840', '0001666700', '0001067983']:
+              f = json.loads(T.indir(f'https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json', ua))
+              d = f['facts']['dei'].get('EntityCommonStockSharesOutstanding', {}).get('units', {}).get('shares', [])
+              print('CIK', cik, f.get('entityName'))
+              for x in sorted(d, key=lambda x: x['end'])[-6:]: print('  DEI', x['end'], x['val'], x.get('filed'), x.get('form'))
+              g = f['facts']['us-gaap']
+              for tag in T.ETIKET['hisseSeyreltilmis'] + ['CommonStockSharesOutstanding']:
+                  u = g.get(tag, {}).get('units', {}).get('shares', [])
+                  for x in sorted(u, key=lambda x: x['end'])[-4:]: print('  ', tag[:40], x.get('start'), x['end'], x['val'], x.get('form'))
+              print('  secilen', T.son_seyreltilmis_adet(f))
+          P
