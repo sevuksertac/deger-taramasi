@@ -1,0 +1,466 @@
+{
+ "tarih": "2026-11-09",
+ "genel": "Geçen hafta (2-6 Kasım) S&P 500 %2,7, Nasdaq %3,4, Dow Jones %0,9 geriledi; Nasdaq üst üste 4. haftasını düşüşle kapattı. Ana olay 5 Kasım'daki yapay zekâ/çip ağırlıklı satıştı: o gün S&P 500 %4,4, Nasdaq %5,5 düştü; Cuma günü çip hisseleri (Micron dahil) kısmen toparlandı ve Nasdaq %1,1 yükseldi. Ekim istihdam verisi 165 bin ile beklentinin (~65 bin) çok üstünde geldi, işsizlik %4,1'e indi. Bu hafta listeden TTD ve HRB bugün (9 Kasım) borsa kapanışından sonra bilanço açıklayacak; sonraki bilançolar ANF ve DLTR için 24 Kasım.",
+ "sirketler": [
+  {
+   "ticker": "MA",
+   "sirket": "Mastercard",
+   "sira": 1,
+   "puan": "84%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "29 Ekim'deki 3. çeyrekte net gelir %14 artışla 9,8 milyar $, düzeltilmiş hisse başı kâr 5,31 $ ile beklentinin (5,16 $) üstündeydi. Bu hafta küçük çaplı bir haber var: Mastercard, yapay zekâ destekli alışveriş asistanı geliştiren firmly'nin 15 milyon $'lık A serisi yatırım turuna katıldı. Şirket önümüzdeki hafta iki yatırımcı konferansına katılacak.",
+   "kaynaklar": [
+    {
+     "baslik": "SEC 8-K (3Ç 2026)",
+     "url": "https://www.sec.gov/Archives/edgar/data/0001141391/000114139126000122/ma09302026-exx991xearnings.htm"
+    },
+    {
+     "baslik": "ad-hoc-news (firmly yatırımı)",
+     "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/mastercard-stock-backs-15-million-ai-commerce-bet/70469777"
+    }
+   ]
+  },
+  {
+   "ticker": "ADBE",
+   "sirket": "Adobe",
+   "sira": 2,
+   "puan": "83%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "olumsuz",
+   "ozet": "Citi 4 Kasım'da Adobe notunu Nötr'den Sat'a indirdi, hedef fiyatı 250 $'dan 207 $'a çekti; gerekçe 2027 büyüme beklentilerinin fazla iyimser olması (yapay zekâ rekabeti, küçük işletme baskısı). Şirketin yıllık ARR hedefi, Semrush satın alması hariç ~%8 büyüme anlamına geliyor. Hisse 6 Kasım'da 239,30 $'dan kapandı, yıl başından beri ~%31 aşağıda; sonraki bilanço Aralık'ta.",
+   "kaynaklar": [
+    {
+     "baslik": "Motley Fool (Citi notu)",
+     "url": "https://www.fool.com/investing/2026/11/09/citi-downgraded-adobe-stock-to-sell-i-d-buy-it-now/"
+    }
+   ]
+  },
+  {
+   "ticker": "DECK",
+   "sirket": "Deckers (HOKA, UGG)",
+   "sira": 3,
+   "puan": "82%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "olumsuz",
+   "ozet": "22 Ekim'deki çeyrekte satışlar %3,5 artıp 1,48 milyar $ oldu ama beklentinin (~1,51 milyar $) altında kaldı. Yıllık satış hedefi düşürüldü (HOKA ve UGG büyüme beklentisi aşağı çekildi), hisse açıklama sonrası ~%8-9 düştü. Hisse başı kâr hedefi ise gümrük vergisi iadeleri sayesinde 7,80-7,95 $'a yükseltildi. Bu hafta Argus 'Al' tavsiyesini korurken hedef fiyatı 128 $'dan 102 $'a düşürdü (4 Kasım kapanışı 89,11 $).",
+   "kaynaklar": [
+    {
+     "baslik": "SEC 8-K",
+     "url": "https://www.sec.gov/Archives/edgar/data/0000910521/000091052126000028/deckex991pressrelease-9302.htm"
+    },
+    {
+     "baslik": "TradingView (Argus)",
+     "url": "https://www.tradingview.com/news/tradingview:b2739425372f5:0-argus-research-maintains-deckers-outdoor-at-buy-lowers-price-target-to-102-from-128/"
+    }
+   ]
+  },
+  {
+   "ticker": "NEM",
+   "sirket": "Newmont",
+   "sira": 4,
+   "puan": "82%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "olumlu",
+   "ozet": "22 Ekim'deki 3. çeyrekte 1,3 milyon ons altın üretti, düzeltilmiş hisse başı kâr 2,20 $ ile 3. çeyrek rekoru oldu, serbest nakit akışı 1,9 milyar $. Yıllık üretim hedefi korundu, maliyet hedefi iyileştirildi. Hisse başı 0,26 $ temettü açıklandı.",
+   "kaynaklar": [
+    {
+     "baslik": "Newmont basın bülteni",
+     "url": "https://www.newmont.com/investors/news-release/news-details/2026/Newmont-Reports-Third-Quarter-2026-Results-with-Record-Third-Quarter-Adjusted-Net-Income-Positioned-to-Achieve-Full-Year-Guidance-Provides-Update-on-Red-Chris-Block-Cave-Project/default.aspx"
+    }
+   ]
+  },
+  {
+   "ticker": "MU",
+   "sirket": "Micron Technology",
+   "sira": 5,
+   "puan": "81%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "olumsuz",
+   "ozet": "5 Kasım'da %17,5 düşüşle 656 $'dan kapandı; son bir yılın en büyük günlük düşüşü. Nedenler yapay zekâ yatırımlarının yavaşlayacağı endişesi ve Micron'un 4,5 milyar $'lık Tayvan fabrikası planını askıya aldığı haberiydi. Cuma (6 Kasım) çip hisseleriyle birlikte kısmen toparlandı; hisse yine de Haziran zirvesinin (1.213 $) çok altında. Sonraki bilanço tahminen 23 Aralık.",
+   "kaynaklar": [
+    {
+     "baslik": "Trefis",
+     "url": "https://www.trefis.com/stock/mu/articles/623345/what-sent-micron-stock-lower/2026-11-06"
+    },
+    {
+     "baslik": "Yahoo Finance",
+     "url": "https://finance.yahoo.com/markets/stocks/articles/micron-stock-flashes-bargain-pricing-024700402.html"
+    }
+   ]
+  },
+  {
+   "ticker": "TTD",
+   "sirket": "The Trade Desk",
+   "sira": 6,
+   "puan": "81%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "3. çeyrek bilançosu 9 Kasım Pazartesi borsa kapanışından sonra açıklanacak. Şirketin kendi tahmini en az 650 milyon $ gelir, yani geçen yılın ~%12 altı. Hisse 2024 sonundan beri ~%89 değer kaybetti; bilanço günü sert hareket olabilir.",
+   "kaynaklar": [
+    {
+     "baslik": "Motley Fool",
+     "url": "https://www.fool.com/investing/2026/11/08/the-trade-desk-stock-has-lost-about-89-since-the-end-of-2024-its-nov-9-report-is-the-next-test/"
+    }
+   ]
+  },
+  {
+   "ticker": "CRUS",
+   "sirket": "Cirrus Logic",
+   "sira": 7,
+   "puan": "80%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "4 Kasım'da açıklanan çeyrekte gelir 559,5 milyon $ (yıllık sabit, çeyreklik +%22) ile beklentiyi aştı. Ancak Aralık çeyreği için 510-570 milyon $ gelir rehberi verildi; şirket bunu gelirin Eylül'e kaymasına ve zayıf PC talebine bağladı. Hisse sonraki gün ~%6 düştü. 500 milyon $'lık yeni hisse geri alımı açıklandı.",
+   "kaynaklar": [
+    {
+     "baslik": "SEC 8-K",
+     "url": "https://www.sec.gov/Archives/edgar/data/0000772406/000077240626000053/pressrelease.htm"
+    },
+    {
+     "baslik": "Motley Fool (görüşme özeti)",
+     "url": "https://www.fool.com/earnings/call-transcripts/2026/11/05/cirrus-logic-crus-q2-2027-earnings-call-transcript/"
+    }
+   ]
+  },
+  {
+   "ticker": "TPR",
+   "sirket": "Tapestry (Coach)",
+   "sira": 8,
+   "puan": "79%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "olumlu",
+   "ozet": "5 Kasım'da güçlü çeyrek: gelir %12 artışla 1,89 milyar $ (beklenti 1,85 milyar $), düzeltilmiş hisse başı kâr 1,82 $ (beklenti 1,56 $). Yıllık kâr hedefi 7,80-7,90 $'dan 8,25-8,35 $'a, gelir hedefi ~8,55 milyar $'a yükseltildi; Coach güçlü, Kate Spade zayıf. Hisse o gün %7,1 yükselişle 134,17 $'dan kapandı.",
+   "kaynaklar": [
+    {
+     "baslik": "Trefis",
+     "url": "https://www.trefis.com/stock/tpr/articles/623368/what-sent-tapestry-stock-higher/2026-11-06"
+    },
+    {
+     "baslik": "StockStory",
+     "url": "https://markets.financialcontent.com/stocks/article/stockstory-2026-11-5-tapestry-nysetpr-beats-q3-cy2026-sales-expectations-stock-jumps-103"
+    }
+   ]
+  },
+  {
+   "ticker": "ANF",
+   "sirket": "Abercrombie & Fitch",
+   "sira": 9,
+   "puan": "79%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "yok",
+   "ozet": "Bu hafta şirkete özel önemli bir haber yok. En son önemli olay 3. çeyrek bilanço tarihinin duyurulmasıydı (30 Ekim). Sonuçlar 24 Kasım Salı sabahı açıklanacak.",
+   "kaynaklar": [
+    {
+     "baslik": "StockTitan (bilanço tarihi)",
+     "url": "https://www.stocktitan.net/news/ANF/abercrombie-fitch-co-to-report-third-quarter-2026-results-on-z7c7u437jg0o.html"
+    }
+   ]
+  },
+  {
+   "ticker": "SFM",
+   "sirket": "Sprouts Farmers Market",
+   "sira": 10,
+   "puan": "78%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "olumsuz",
+   "ozet": "28 Ekim'deki zayıf çeyrekte (aynı mağaza satışları -%0,9, hisse başı kâr 1,21 $ ile beklentinin altında) hisse ~%22 düşmüştü; ardından BofA notu Düşük Performans'a indirdi, Goldman hedefi 94 $'dan 58 $'a çekti. Bu hafta 5 Kasım'da Northcoast Research da notu Al'dan Nötr'e düşürdü; hisse o gün yine de ~%3,6 yükseldi.",
+   "kaynaklar": [
+    {
+     "baslik": "MarketBeat (Northcoast)",
+     "url": "https://www.marketbeat.com/instant-alerts/analyst-sprouts-farmers-market-nasdaq-sfm-stock-rating-cut-to-neutral-at-northcoast-research-2026-11-05/"
+    }
+   ]
+  },
+  {
+   "ticker": "MPC",
+   "sirket": "Marathon Petroleum",
+   "sira": 11,
+   "puan": "78%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "3 Kasım'da rekor çeyrek açıkladı: düzeltilmiş hisse başı kâr 26,93 $ (geçen yıl 3,01 $); temettü %10 artırıldı, iki rafineri 4,2 milyar $'a CVR Energy'ye satılıyor. Buna rağmen hisse 6 Kasım'a kadar 5 günde %16,2 düşüp 372,74 $'a geriledi (bir ayda -%19,6); belirgin tek bir neden açıklanmadı.",
+   "kaynaklar": [
+    {
+     "baslik": "Trefis (5 günlük düşüş)",
+     "url": "https://www.trefis.com/stock/mpc/articles/623570/a-5-day-losing-streak-has-marathon-petroleum-stock-down-16/2026-11-07"
+    },
+    {
+     "baslik": "Yahoo Finance (rafineri satışı)",
+     "url": "https://finance.yahoo.com/energy/articles/marathon-petroleum-mpc-agrees-4-141234245.html"
+    }
+   ]
+  },
+  {
+   "ticker": "DINO",
+   "sirket": "HF Sinclair",
+   "sira": 12,
+   "puan": "78%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "olumlu",
+   "ozet": "28 Ekim'de rekor çeyrek kârı açıkladı: net kâr 2,0 milyar $ (hisse başı 11,38 $), düzeltilmiş FAVÖK ~3 milyar $; neden güçlü rafineri marjları. Aynı gün 1 Ocak 2027'den geçerli CEO değişikliği duyuruldu.",
+   "kaynaklar": [
+    {
+     "baslik": "HF Sinclair basın bülteni",
+     "url": "https://investor.hfsinclair.com/investor-relations/press-releases/press-releases-details/2026/HF-Sinclair-Reports-2026-Third-Quarter-Results-and-Announces-Regular-Cash-Dividend/default.aspx"
+    },
+    {
+     "baslik": "MarketScreener",
+     "url": "https://www.marketscreener.com/news/hf-sinclair-corporation-reports-earnings-results-for-the-third-quarter-and-nine-months-ended-septemb-ce785cd2dc8df723"
+    }
+   ]
+  },
+  {
+   "ticker": "CF",
+   "sirket": "CF Industries",
+   "sira": 13,
+   "puan": "78%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "4 Kasım'daki 3. çeyrekte net kâr 436 milyon $, hisse başı kâr 2,87 $ (geçen yıl 2,19 $; beklenti ~3,00 $) oldu, düzeltilmiş FAVÖK 833 milyon $. Yazoo City tesisindeki duruş sürüyor, yeniden açılış 2027 ilk yarısında bekleniyor. Şirket azot piyasasının 2027'ye kadar sıkı kalacağını öngörüyor; hisse sonraki gün ~%6 yükseldi.",
+   "kaynaklar": [
+    {
+     "baslik": "SEC 8-K (3Ç 2026)",
+     "url": "https://www.sec.gov/Archives/edgar/data/0001324404/000132440426000023/cf-11042026_ex991xearnings.htm"
+    }
+   ]
+  },
+  {
+   "ticker": "HRB",
+   "sirket": "H&R Block",
+   "sira": 14,
+   "puan": "78%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "Mali 2027 1. çeyrek sonuçları bugün (9 Kasım) borsa kapanışından sonra açıklanacak. Beklenti hisse başı -1,40 $ zarar ve 212 milyon $ gelir; bu çeyrek vergi sezonu dışında olduğu için mevsimsel zarar normaldir.",
+   "kaynaklar": [
+    {
+     "baslik": "Benzinga (beklentiler)",
+     "url": "https://www.benzinga.com/quote/HRB/earnings-forecasts"
+    }
+   ]
+  },
+  {
+   "ticker": "DLTR",
+   "sirket": "Dollar Tree",
+   "sira": 15,
+   "puan": "78%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "Hisse Ekim başından beri %20'den fazla yükseldi; Loop Capital 5 Kasım'da notu Al'dan Tut'a indirdi (gerekçe değerleme). 6 Kasım'da hisse %4,9 düşüşle 131 $'dan kapandı. 3. çeyrek sonuçları 24 Kasım Salı sabahı açıklanacak.",
+   "kaynaklar": [
+    {
+     "baslik": "CNBC",
+     "url": "https://www.cnbc.com/2026/11/04/stock-market-today-live-updates.html"
+    },
+    {
+     "baslik": "GuruFocus",
+     "url": "https://www.gurufocus.com/news/9182380/dollar-tree-inc-dltr-stock-down-49-but-still-overvalued-gf-score-75100"
+    },
+    {
+     "baslik": "StockTitan (bilanço tarihi)",
+     "url": "https://www.stocktitan.net/news/DLTR/dollar-tree-inc-to-host-third-quarter-earnings-conference-4ij4ufq90s64.html"
+    }
+   ]
+  },
+  {
+   "ticker": "CPT",
+   "sirket": "Camden Property Trust",
+   "sira": 16,
+   "puan": "77%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "5 Kasım'da açıklanan çeyrekte Core FFO 1,71 $ ile beklentiyi 2 sent aştı, yıllık Core FFO hedefi (orta nokta 6,75 $) korundu. Kaliforniya portföyünün 1,6 milyar $'a satışı tamamlandı, gelirin bir kısmıyla borç kapatıldı.",
+   "kaynaklar": [
+    {
+     "baslik": "GuruFocus",
+     "url": "https://www.gurufocus.com/news/9182055/camden-property-trust-cpt-reports-q3-earnings-beat-maintains-fullyear-guidance"
+    }
+   ]
+  },
+  {
+   "ticker": "LULU",
+   "sirket": "lululemon",
+   "sira": 17,
+   "puan": "77%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "olumsuz",
+   "ozet": "6 Kasım'da CEO Heidi O'Neill iki üst düzey atama yaptı: Four Seasons'tan Ben Hallam marka direktörü (9 Kasım itibarıyla), BCG'den Emily Sunderland strateji direktörü (23 Kasım itibarıyla). Şirkete karşı Eylül'deki hedef düşürme sonrası açılan sınıf davası sürüyor; hisse yıl başından beri ~%47 aşağıda. 3. çeyrek sonuçları Aralık'ta bekleniyor.",
+   "kaynaklar": [
+    {
+     "baslik": "BNN Bloomberg",
+     "url": "https://www.bnnbloomberg.ca/business/company-news/2026/11/06/lululemon-names-brand-strategy-chiefs-in-latest-executive-shakeup/"
+    }
+   ]
+  },
+  {
+   "ticker": "EXEL",
+   "sirket": "Exelixis",
+   "sira": 18,
+   "puan": "77%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "olumlu",
+   "ozet": "29 Ekim'deki çeyrekte gelir 658,7 milyon $ oldu, ana ilaç Cabometyx'in ABD satışları ~%11 büyüdü. 3 Kasım'da HC Wainwright hedef fiyatı 56 $'dan 78 $'a yükseltti, hisse ~72,20 $ ile 52 haftanın zirvesini gördü. Olumsuz taraf: zanzalintinib'in FDA karar tarihi 3 Mart 2027'ye ertelendi.",
+   "kaynaklar": [
+    {
+     "baslik": "MarketBeat (HC Wainwright)",
+     "url": "https://www.marketbeat.com/instant-alerts/price-exelixis-nasdaq-exel-hits-new-1-year-high-on-analyst-upgrade-2026-11-03/"
+    }
+   ]
+  },
+  {
+   "ticker": "MRP",
+   "sirket": "Millrose Properties",
+   "sira": 19,
+   "puan": "77%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "olumlu",
+   "ozet": "27 Ekim'de rekor çeyrek: net kâr 130 milyon $ (hisse başı 0,78 $), AFFO üst üste 6. çeyrek arttı ve 4. çeyrek hedefi yükseltildi. 250 milyon $'lık hisse geri alım programı onaylandı. Lennar dışındaki müşteri sayısı 22'ye çıktı.",
+   "kaynaklar": [
+    {
+     "baslik": "Nasdaq (basın bülteni)",
+     "url": "https://www.nasdaq.com/press-release/millrose-properties-reports-third-quarter-2026-financial-results-2026-10-27"
+    }
+   ]
+  },
+  {
+   "ticker": "PYPL",
+   "sirket": "PayPal",
+   "sira": 20,
+   "puan": "77%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "Hisse hafta boyunca %3,9 yükselip 59,24 $'dan kapandı. 27 Ekim'deki bilançoda gelir beklentinin hafif altında kaldı ama 2026 kâr hedefi ~5,60 $'a yükseltildi. Bu hafta Freedom Broker notunu Tut'a indirdi; CEO ise CNBC'de dönüşüm planını anlattı.",
+   "kaynaklar": [
+    {
+     "baslik": "Trefis",
+     "url": "https://www.trefis.com/stock/pypl/articles/622317/what-did-paypals-quarter-change-for-its-stock/2026-11-03"
+    },
+    {
+     "baslik": "MarketBeat",
+     "url": "https://www.marketbeat.com/instant-alerts/analyst-paypal-nasdaq-pypl-stock-moved-down-to-hold-by-freedom-broker-2026-11-05/"
+    }
+   ]
+  },
+  {
+   "ticker": "V",
+   "sirket": "Visa",
+   "sira": 21,
+   "puan": "77%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "27 Ekim'de mali 4. çeyrek: gelir %13 artışla 12,1 milyar $, düzeltilmiş hisse başı kâr 3,48 $ ile beklentiyi aştı; temettü %16 artırıldı. Hisse yine de mesai sonrası ~%1 geriledi, çünkü 2027'de müşteri teşviklerinin artması marjlara baskı yapabilir. Bu hafta şirkete özel yeni haber yok.",
+   "kaynaklar": [
+    {
+     "baslik": "SEC 8-K",
+     "url": "https://www.sec.gov/Archives/edgar/data/0001403161/000140316126000126/q42026earningsrelease.htm"
+    },
+    {
+     "baslik": "Investing.com",
+     "url": "https://www.investing.com/news/company-news/visa-q4-fy2026-slides-13-revenue-growth-shares-dip-on-outlook-93CH-4977178"
+    }
+   ]
+  },
+  {
+   "ticker": "GNTX",
+   "sirket": "Gentex",
+   "sira": 22,
+   "puan": "76%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "23 Ekim'deki çeyrekte satışlar 647,7 milyon $ ile yatay kaldı, brüt marj %33,4'e geriledi ve yıllık gelir hedefi ~2,65 milyar $'a düşürüldü; otomotiv dışı gelirler %17 büyüdü. Bu hafta yeni bir şirket haberi yok; bazı hukuk bürolarının bu sonuçlarla ilgili 'yatırımcı soruşturması' duyuruları sürüyor.",
+   "kaynaklar": [
+    {
+     "baslik": "Gentex yatırımcı ilişkileri",
+     "url": "https://ir.gentex.com/news-releases/news-release-details/gentex-reports-third-quarter-2026-financial-results"
+    },
+    {
+     "baslik": "NatLawReview",
+     "url": "https://natlawreview.com/press-releases/bronstein-gewirtz-grossman-llc-initiates-investigation-allegations-1737"
+    }
+   ]
+  },
+  {
+   "ticker": "LOGI",
+   "sirket": "Logitech",
+   "sira": 23,
+   "puan": "76%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "olumsuz",
+   "ozet": "27 Ekim'de üst üste 11. büyüme çeyreği: satışlar %3 artışla 1,22 milyar $, düzeltilmiş hisse başı kâr 1,51 $ ile beklentinin çok üstünde. Ancak bir çip tedarikçisindeki tesis kapanması Aralık çeyreğinde ~70-80 milyon $ gelir kaybına yol açacak; rehber 1,36-1,43 milyar $ gelir ve %41-42 brüt marj. Hisse 6 Kasım'da 200 günlük ortalamanın altına indi.",
+   "kaynaklar": [
+    {
+     "baslik": "Logitech yatırımcı ilişkileri",
+     "url": "https://ir.logitech.com/news/news-details/2026/Logitech-Announces-Q2-Fiscal-Year-2027-Results/default.aspx"
+    },
+    {
+     "baslik": "ad-hoc-news",
+     "url": "https://ad-hoc-news.de/boerse/news/unternehmensnachrichten/logitech-faces-a-two-front-test-supplier-disruption-and-a-marketing-firestorm/70476501"
+    }
+   ]
+  },
+  {
+   "ticker": "AOS",
+   "sirket": "A. O. Smith",
+   "sira": 24,
+   "puan": "76%",
+   "endeks": "S&P 500",
+   "yeni": false,
+   "yon": "notr",
+   "ozet": "29 Ekim'de satışlar 941 milyon $ ile yatay, hisse başı kâr 0,93 $ ile beklentinin hafif üstünde. Büyük haber: Çin işinin %81'i ~400 milyon $'a CPE'ye satılıyor (kapanış 2027 ilk yarısı); şirket bunun FVÖK marjını ~2 puan artıracağını söylüyor. Hisse görüşme günü ~%4 yükseldi.",
+   "kaynaklar": [
+    {
+     "baslik": "A. O. Smith yatırımcı ilişkileri",
+     "url": "https://investor.aosmith.com/news-releases/news-release-details/o-smith-reports-third-quarter-2026-results"
+    },
+    {
+     "baslik": "Motley Fool (görüşme özeti)",
+     "url": "https://www.fool.com/earnings/call-transcripts/2026/10/29/a-o-smith-aos-q3-2026-earnings-call-transcript/"
+    }
+   ]
+  },
+  {
+   "ticker": "MLI",
+   "sirket": "Mueller Industries",
+   "sira": 25,
+   "puan": "76%",
+   "endeks": "Aday",
+   "yeni": false,
+   "yon": "olumsuz",
+   "ozet": "20 Ekim'deki çeyrekte satışlar bakır fiyatlarının etkisiyle %31,6 artışla 1,42 milyar $ oldu, hisse başı kâr 1,00 $ ile beklentiyi 1 sent ıskaladı ve marjlar daraldı. Hisse 6 Kasım'da 52,96 $'dan kapandı, 52 haftalık dibe (52,00 $) çok yakın. Çeyreklik temettü 0,175 $ olarak korundu (ödeme 18 Aralık).",
+   "kaynaklar": [
+    {
+     "baslik": "GuruFocus (temettü)",
+     "url": "https://www.gurufocus.com/news/9184151/mueller-industries-mli-declares-quarterly-dividend-reports-mixed-earnings"
+    },
+    {
+     "baslik": "AAII",
+     "url": "https://www.aaii.com/investingideas/article/556517-why-mueller-industries-inc8217s-mli-stock-is-down-586"
+    }
+   ]
+  }
+ ]
+}
