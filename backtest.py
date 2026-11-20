@@ -437,7 +437,7 @@ def puanla(df):
     pdg = df['pd']
     fd = pdg + N(d['borc']) - N(d['nakit'])
     favok = d['ebitTTM'] + N(d['amortismanTTM'])
-    sna = d['inaTTM'] - N(d['capexTTM'])
+    sna = d['inaTTM'] - d['capexTTM']   # capex yoksa SNA boş kalır (0 sayılırsa SNA = İNA çıkıyordu)
     m = pd.DataFrame(index=df.index)
     m['ebit_fd'] = (d['ebitTTM'] / fd).where(diger & (fd > 0))
     m['sna_get'] = (sna / pdg).where(diger & (pdg > 0))

@@ -48,7 +48,10 @@ ETIKET = {
                    'DepreciationAmortizationAndAccretionNet', 'Depreciation'],
     'ina': ['NetCashProvidedByUsedInOperatingActivities',
             'NetCashProvidedByUsedInOperatingActivitiesContinuingOperations'],
-    'capex': ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets'],
+    # Petrol/gaz şirketleri yatırımı ayrı etiketle raporlar (APA, EOG...); bunlar yoksa SNA = İNA çıkıyordu.
+    'capex': ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets',
+              'PaymentsToAcquireOilAndGasPropertyAndEquipment', 'PaymentsToExploreAndDevelopOilAndGasProperties',
+              'PaymentsToAcquireOilAndGasProperty', 'PaymentsForCapitalImprovements'],
     'faiz': ['InterestExpense', 'InterestExpenseNonoperating', 'InterestExpenseDebt', 'InterestAndDebtExpense'],
     'varlik': ['Assets'],
     'yukumluluk': ['Liabilities'],
